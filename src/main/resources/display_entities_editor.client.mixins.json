@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "work.yoavtc.displayentitieseditor.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"MinecraftMixin",
+		"MouseHandlerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

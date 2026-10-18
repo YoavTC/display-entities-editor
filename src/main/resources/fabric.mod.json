@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "display_entities_editor",
+	"version": "${version}",
+	"name": "Display Entities Editor",
+	"description": "In-world gizmo controls for editing display entities.",
+	"authors": ["yoavtc"],
+	"contact": {
+		"homepage": "https://yoavtc.work"
+	},
+	"license": "MIT",
+	"environment": "*",
+	"accessWidener": "display_entities_editor.accesswidener",
+	"entrypoints": {
+		"main": ["work.yoavtc.displayentitieseditor.DisplayEntitiesEditor"],
+		"client": ["work.yoavtc.displayentitieseditor.client.DisplayEntitiesEditorClient"]
+	},
+	"mixins": [
+		{ "config": "display_entities_editor.client.mixins.json", "environment": "client" }
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

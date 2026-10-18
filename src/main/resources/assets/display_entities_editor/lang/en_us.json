@@ -1,0 +1,7 @@
+{
+	"key.category.display_entities_editor.main": "Display Entities Editor",
+	"key.display_entities_editor.cycle_mode": "Cycle Mode (Translate / Rotate / Scale)",
+	"key.display_entities_editor.cycle_nudge": "Cycle Scroll Nudge Amount",
+	"key.display_entities_editor.delete": "Delete Selected Display",
+	"key.display_entities_editor.undo": "Undo (with Ctrl)"
+}

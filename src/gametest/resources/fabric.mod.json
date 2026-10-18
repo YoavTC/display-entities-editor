@@ -1,0 +1,13 @@
+{
+	"schemaVersion": 1,
+	"id": "display_entities_editor-test",
+	"version": "1.0.0",
+	"name": "Display Entities Editor Tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": ["work.yoavtc.displayentitieseditor.test.GizmoClientTest", "work.yoavtc.displayentitieseditor.test.RingAxisTest", "work.yoavtc.displayentitieseditor.test.QuickMenuTest", "work.yoavtc.displayentitieseditor.test.SecurityTest", "work.yoavtc.displayentitieseditor.test.RayRangeTest", "work.yoavtc.displayentitieseditor.test.HeadTextureTest", "work.yoavtc.displayentitieseditor.test.NonOpTest", "work.yoavtc.displayentitieseditor.test.NudgeTest"]
+	},
+	"depends": {
+		"display_entities_editor": "*"
+	}
+}
