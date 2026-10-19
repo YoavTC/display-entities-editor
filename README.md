@@ -9,6 +9,11 @@ A Fabric mod for **Minecraft 26.3** that adds in-world gizmo controls for editin
 
 [![a](https://markdown-videos-api.jorgenkh.no/youtube/xQs9YN0iAR0?width=320&height=180&filetype=jpeg)](https://youtu.be/xQs9YN0iAR0)
 
+## Disclaimers
+
+- This mod was inspired by the works of [bikerboys](https://modrinth.com/user/bikerboys), [SlothyUWU](https://modrinth.com/user/SlothyUwU), and [Gm4](https://modrinth.com/user/Gm4), and their projects, respectively [Pivot](https://modrinth.com/mod/pivot), [Sloths Display Entity Editor](https://modrinth.com/datapack/sloths-display-entity-editor), and [Survival Displays](https://modrinth.com/datapack/survival-displays).
+- This mod was coded entirely by an AI agent. Just wanna be transparent about that
+
 ## Config
 
 Config file available at `config/display_entities_editor.json` with the following options:
