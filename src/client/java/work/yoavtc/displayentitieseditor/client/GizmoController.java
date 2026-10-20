@@ -545,12 +545,19 @@ public final class GizmoController {
 		for (Display d : displays) {
 			AABB box = worldBounds(d).inflate(0.05);
 			double t = rayAabb(ro, rd, box);
-			if (t >= 0 && t < bestT) {
+			if (t >= 0 && t < bestT && hasLineOfSight(mc, ro, rd, t)) {
 				bestT = t;
 				best = d;
 			}
 		}
 		return best;
+	}
+
+	/** True unless a solid block lies meaningfully closer to the camera than the display hit at distance {@code t}. */
+	private static boolean hasLineOfSight(Minecraft mc, Vec3 ro, Vec3 rd, double t) {
+		net.minecraft.world.phys.BlockHitResult hit = mc.level.clip(new net.minecraft.world.level.ClipContext(ro, ro.add(rd.scale(t)),
+				net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, mc.player));
+		return hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS || ro.distanceTo(hit.getLocation()) >= t - 0.1;
 	}
 
 	private static Vec3[] localCorners(Display d, Vec3 origin, Transformation t, Quaternionf l, Vector3f s) {
