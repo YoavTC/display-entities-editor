@@ -25,6 +25,10 @@ Config file available at `config/display_entities_editor.json` with the followin
 - `allow_non_operators` (default `true`): whether players without operator permission may edit displays. This is read by the server. Set it to `false` to require operator permission.
 - `line_width` (default `1.5`, range 0.5 - 10): base width of the lines the in-world editor draws (axes, rings, outlines). Read by the client; the thicker hover and drag highlights scale with it.
 
+## Deleting displays
+
+Deleting a display (the Delete key or the quick menu) only drops an item frame for displays this mod created from an item frame. Those carry the entity tag `display_entities_editor.from_frame`, which is saved with the entity. Displays without the tag, such as ones summoned by command, are simply removed and drop nothing.
+
 ## Building
 ```
 ./gradlew build            # jar in build/libs

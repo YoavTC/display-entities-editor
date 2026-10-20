@@ -136,7 +136,11 @@ final class QuickActions {
 	private static void delete(ServerPlayer player, Display display) {
 		ServerLevel level = player.level();
 		Vec3 at = center(display);
+		boolean fromFrame = display.entityTags().contains(DisplayEntitiesEditor.FROM_FRAME_TAG);
 		display.discard();
+		if (!fromFrame) {
+			return;
+		}
 		ItemEntity drop = new ItemEntity(level, at.x, at.y, at.z, new ItemStack(Items.ITEM_FRAME));
 		drop.setDefaultPickUpDelay();
 		level.addFreshEntity(drop);
