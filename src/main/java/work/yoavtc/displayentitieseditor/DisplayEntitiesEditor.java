@@ -28,6 +28,9 @@ import org.joml.Vector3f;
  * the player must hold the wand (and be an operator unless the config allows everyone), near the display, and within rate limits.
  */
 public class DisplayEntitiesEditor implements ModInitializer {
+	/** Entity tag on displays this mod created from an item frame; only these drop an item frame when deleted. */
+	public static final String FROM_FRAME_TAG = "display_entities_editor.from_frame";
+
 	public static final String MOD_ID = "display_entities_editor";
 	public static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(MOD_ID);
 

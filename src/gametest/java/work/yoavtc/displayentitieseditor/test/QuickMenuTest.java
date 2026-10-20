@@ -12,7 +12,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** LMB editing, the sneak+click quick menu and its actions, and delete dropping an item frame. */
+/** LMB editing, the sneak+click quick menu and its actions, and delete not dropping a frame for command-summoned displays. */
 public class QuickMenuTest implements FabricClientGameTest {
 	private static final AABB ALL = new AABB(-200, -64, -200, 200, 320, 200);
 
@@ -130,7 +130,7 @@ public class QuickMenuTest implements FabricClientGameTest {
 			context.waitTicks(20);
 			context.takeScreenshot("q3-gold");
 
-			// ---- delete drops an item frame
+			// ---- delete of a command-summoned display drops nothing (only frame-converted displays drop a frame)
 			openMenuBySneakClick(context);
 			context.clickScreenButton("Delete");
 			context.waitTicks(20);
@@ -146,7 +146,7 @@ public class QuickMenuTest implements FabricClientGameTest {
 				}
 				return new int[] {displays, frames};
 			});
-			System.out.println("[quick-test] after delete displays=" + counts[0] + " droppedFrames=" + counts[1]);
+			System.out.println("[quick-test] after delete displays=" + counts[0] + " droppedFrames=" + counts[1] + (counts[0] == 0 && counts[1] == 0 ? " PASS" : " FAIL expected 0 displays and 0 frames"));
 		}
 	}
 }
