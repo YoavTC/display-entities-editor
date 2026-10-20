@@ -586,7 +586,8 @@ public final class GizmoController {
 		for (Display d : displays) {
 			Vec3 toCentre = displayCentre(d).subtract(ro);
 			double along = toCentre.dot(rd);
-			boolean inBox = rayAabb(ro, rd, worldBounds(d).inflate(0.05)) >= 0;
+			double boxT = rayAabb(ro, rd, worldBounds(d).inflate(0.05));
+			boolean inBox = boxT >= 0;
 			if (along < 0 && !inBox) {
 				continue;
 			}
@@ -596,6 +597,10 @@ public final class GizmoController {
 			if (!inBox && !onMarker) {
 				continue;
 			}
+			// nothing solid may stand between the camera and the display (the box hit, or the marker if only that was hit)
+			if (!hasLineOfSight(mc, ro, rd, inBox ? boxT : along)) {
+				continue;
+			}
 			double score = off + along * 1.0e-4; // nearer wins an exact tie
 			if (score < bestScore) {
 				bestScore = score;
@@ -603,6 +608,13 @@ public final class GizmoController {
 			}
 		}
 		return best;
+	}
+
+	/** True unless a solid block lies meaningfully closer to the camera than the display hit at distance {@code t}. */
+	private static boolean hasLineOfSight(Minecraft mc, Vec3 ro, Vec3 rd, double t) {
+		net.minecraft.world.phys.BlockHitResult hit = mc.level.clip(new net.minecraft.world.level.ClipContext(ro, ro.add(rd.scale(t)),
+				net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, mc.player));
+		return hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS || ro.distanceTo(hit.getLocation()) >= t - 0.1;
 	}
 
 	private static Vec3[] localCorners(Display d, Vec3 origin, Transformation t, Quaternionf l, Vector3f s) {
