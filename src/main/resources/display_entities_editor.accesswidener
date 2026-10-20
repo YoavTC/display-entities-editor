@@ -4,3 +4,5 @@ accessible method net/minecraft/world/entity/Display createTransformation (Lnet/
 accessible method net/minecraft/world/entity/Display setTransformationInterpolationDuration (I)V
 accessible method net/minecraft/world/entity/Display getTransformationInterpolationDuration ()I
 accessible method net/minecraft/world/entity/Display$ItemDisplay getItemStack ()Lnet/minecraft/world/item/ItemStack;
+accessible method net/minecraft/world/entity/Display setPosRotInterpolationDuration (I)V
+accessible method net/minecraft/world/entity/Display getPosRotInterpolationDuration ()I
