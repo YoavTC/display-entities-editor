@@ -647,13 +647,22 @@ public final class GizmoController {
 		drawBox(localCorners(selected, pos, t, left, scale), 0xFFFFFFFF, 1.5f);
 	}
 
-	/** With nothing selected, outline every display near the player; the one under the crosshair is brighter. */
+	/** With nothing selected, mark the visual centre of every display near the player; the one under the crosshair is bigger and white. */
 	private static void highlightNearby(Minecraft mc, Vec3 ro, Vec3 rd) {
 		Display target = pickDisplay(mc, ro, rd);
 		for (Display d : mc.level.getEntitiesOfClass(Display.class, new AABB(ro, ro).inflate(HIGHLIGHT_RADIUS))) {
 			Transformation t = Display.createTransformation(d.getEntityData());
 			Vec3[] c = localCorners(d, d.position(), t, new Quaternionf(t.leftRotation()), new Vector3f(t.scale()));
-			drawBox(c, d == target ? 0xFFFFFFFF : 0xFF55DDFF, d == target ? 2.5f : 1.5f);
+			Vec3 centre = Vec3.ZERO;
+			for (Vec3 v : c) {
+				centre = centre.add(v);
+			}
+			centre = centre.scale(1.0 / c.length);
+			boolean hot = d == target;
+			double h = ro.distanceTo(centre) * (hot ? 0.025 : 0.016);
+			int color = hot ? 0xFFFFFFFF : 0xFF55DDFF;
+			emit(Gizmos.cuboid(new AABB(centre.x - h, centre.y - h, centre.z - h, centre.x + h, centre.y + h, centre.z + h),
+				GizmoStyle.strokeAndFill(color, scaled(hot ? 2f : 1f), color)));
 		}
 	}
 

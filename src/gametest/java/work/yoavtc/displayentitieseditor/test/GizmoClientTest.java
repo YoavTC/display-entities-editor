@@ -331,6 +331,14 @@ public class GizmoClientTest implements FabricClientGameTest {
 						}
 						return n;
 					}));
+
+				// ---- unselected: centre markers for several displays (block, item, text)
+				context.runOnClient(mc -> GizmoController.selected = null);
+				sp.getServer().runCommand("tp Player0 9.5 -60 9.5");
+				context.waitTicks(10);
+				aimAt(context, new Vec3(9.5, -59.3, 3.5), 0, 0);
+				context.waitTicks(5);
+				context.takeScreenshot("16-centre-markers");
 		}
 	}
 }
