@@ -188,6 +188,7 @@ public final class GizmoController {
 			return;
 		}
 		resolvePendingSelect(mc);
+		holdPreview();
 		if (selected != null && (selected.isRemoved() || selected.level() != mc.level)) {
 			selected = null;
 			cancelDrag();
@@ -318,6 +319,30 @@ public final class GizmoController {
 				new Quaternionf(old.rightRotation())));
 		d.setPos(p.x, p.y, p.z);
 		d.setOldPosAndRot();
+		// Server position updates interpolate (smooth for other viewers); keep them from dragging our local preview around.
+		d.getInterpolation().cancel();
+		holdDisplay = d;
+		holdPos = p;
+		holdUntilMs = System.currentTimeMillis() + PREVIEW_HOLD_MS;
+	}
+
+	private static final long PREVIEW_HOLD_MS = 500;
+	private static Display holdDisplay;
+	private static Vec3 holdPos;
+	private static long holdUntilMs;
+
+	/** After an edit the server's (lagging, interpolated) position syncs back; keep showing our own until it caught up. */
+	private static void holdPreview() {
+		if (holdDisplay == null) {
+			return;
+		}
+		if (System.currentTimeMillis() > holdUntilMs || holdDisplay.isRemoved()) {
+			holdDisplay = null;
+			return;
+		}
+		holdDisplay.getInterpolation().cancel();
+		holdDisplay.setPos(holdPos.x, holdPos.y, holdPos.z);
+		holdDisplay.setOldPosAndRot();
 	}
 
 	private static void send() {
@@ -537,20 +562,59 @@ public final class GizmoController {
 		return best;
 	}
 
+	/** Visual centre of a display in world space (the mean of its transformed box corners). */
+	private static Vec3 displayCentre(Display d) {
+		Transformation t = Display.createTransformation(d.getEntityData());
+		Vec3[] c = localCorners(d, d.position(), t, new Quaternionf(t.leftRotation()), new Vector3f(t.scale()));
+		Vec3 centre = Vec3.ZERO;
+		for (Vec3 v : c) {
+			centre = centre.add(v);
+		}
+		return centre.scale(1.0 / c.length);
+	}
+
+	/**
+	 * The display the player is looking at. Many displays can overlap or sit close together, so instead of taking
+	 * the first box the ray enters, take the display whose centre (the marker shown while nothing is selected) is
+	 * closest to the look ray. A display qualifies if the ray passes through its box or close to its centre marker.
+	 */
 	private static Display pickDisplay(Minecraft mc, Vec3 ro, Vec3 rd) {
 		AABB search = new AABB(ro, ro.add(rd.scale(RAY_RANGE))).inflate(8);
 		List<Display> displays = mc.level.getEntitiesOfClass(Display.class, search);
 		Display best = null;
-		double bestT = Double.MAX_VALUE;
+		double bestScore = Double.MAX_VALUE;
 		for (Display d : displays) {
-			AABB box = worldBounds(d).inflate(0.05);
-			double t = rayAabb(ro, rd, box);
-			if (t >= 0 && t < bestT) {
-				bestT = t;
+			Vec3 toCentre = displayCentre(d).subtract(ro);
+			double along = toCentre.dot(rd);
+			double boxT = rayAabb(ro, rd, worldBounds(d).inflate(0.05));
+			boolean inBox = boxT >= 0;
+			if (along < 0 && !inBox) {
+				continue;
+			}
+			double off = toCentre.subtract(rd.scale(along)).length();
+			// aiming right at the centre marker counts even if the ray just misses a very small box
+			boolean onMarker = along >= 0 && along <= RAY_RANGE && off < 0.05 * along + 0.04;
+			if (!inBox && !onMarker) {
+				continue;
+			}
+			// nothing solid may stand between the camera and the display (the box hit, or the marker if only that was hit)
+			if (!hasLineOfSight(mc, ro, rd, inBox ? boxT : along)) {
+				continue;
+			}
+			double score = off + along * 1.0e-4; // nearer wins an exact tie
+			if (score < bestScore) {
+				bestScore = score;
 				best = d;
 			}
 		}
 		return best;
+	}
+
+	/** True unless a solid block lies meaningfully closer to the camera than the display hit at distance {@code t}. */
+	private static boolean hasLineOfSight(Minecraft mc, Vec3 ro, Vec3 rd, double t) {
+		net.minecraft.world.phys.BlockHitResult hit = mc.level.clip(new net.minecraft.world.level.ClipContext(ro, ro.add(rd.scale(t)),
+				net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, mc.player));
+		return hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS || ro.distanceTo(hit.getLocation()) >= t - 0.1;
 	}
 
 	private static Vec3[] localCorners(Display d, Vec3 origin, Transformation t, Quaternionf l, Vector3f s) {
@@ -647,13 +711,16 @@ public final class GizmoController {
 		drawBox(localCorners(selected, pos, t, left, scale), 0xFFFFFFFF, 1.5f);
 	}
 
-	/** With nothing selected, outline every display near the player; the one under the crosshair is brighter. */
+	/** With nothing selected, mark the visual centre of every display near the player; the one under the crosshair is bigger and white. */
 	private static void highlightNearby(Minecraft mc, Vec3 ro, Vec3 rd) {
 		Display target = pickDisplay(mc, ro, rd);
 		for (Display d : mc.level.getEntitiesOfClass(Display.class, new AABB(ro, ro).inflate(HIGHLIGHT_RADIUS))) {
-			Transformation t = Display.createTransformation(d.getEntityData());
-			Vec3[] c = localCorners(d, d.position(), t, new Quaternionf(t.leftRotation()), new Vector3f(t.scale()));
-			drawBox(c, d == target ? 0xFFFFFFFF : 0xFF55DDFF, d == target ? 2.5f : 1.5f);
+			Vec3 centre = displayCentre(d);
+			boolean hot = d == target;
+			double h = ro.distanceTo(centre) * (hot ? 0.025 : 0.016);
+			int color = hot ? 0xFFFFFFFF : 0xFF55DDFF;
+			emit(Gizmos.cuboid(new AABB(centre.x - h, centre.y - h, centre.z - h, centre.x + h, centre.y + h, centre.z + h),
+				GizmoStyle.strokeAndFill(color, scaled(hot ? 2f : 1f), color)));
 		}
 	}
 

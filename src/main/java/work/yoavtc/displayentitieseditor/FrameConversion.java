@@ -137,6 +137,7 @@ final class FrameConversion {
 			tell(player, "Could not create the display.");
 			return;
 		}
+		display.addTag(DisplayEntitiesEditor.FROM_FRAME_TAG);
 		frame.discard();
 		if (level.addFreshEntity(display)) {
 			ServerPlayNetworking.send(player, new SelectPayload(display.getId()));

@@ -183,6 +183,36 @@ public class GizmoClientTest implements FabricClientGameTest {
 			System.out.println("[gizmo-test] after convert: frames=" + counts[0] + " displays=" + counts[1]);
 			context.takeScreenshot("10-converted");
 
+			// ---- deleting a frame-converted display drops exactly one item frame; it carries the tag
+			int taggedId = sp.getServer().computeOnServer(server -> {
+				for (var level : server.getAllLevels()) {
+					for (Display d : level.getEntitiesOfClass(Display.class, new AABB(-100, -64, -100, 100, 320, 100))) {
+						if (d.entityTags().contains(work.yoavtc.displayentitieseditor.DisplayEntitiesEditor.FROM_FRAME_TAG)) {
+							return d.getId();
+						}
+					}
+				}
+				return -1;
+			});
+			boolean tagged = taggedId >= 0;
+			context.runOnClient(mc -> net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+					new work.yoavtc.displayentitieseditor.net.QuickActionPayload(taggedId, work.yoavtc.displayentitieseditor.net.QuickActionPayload.Action.DELETE)));
+			context.waitTicks(20);
+			int[] del = sp.getServer().computeOnServer(server -> {
+				int displays = 0, frames = 0;
+				for (var level : server.getAllLevels()) {
+					displays += level.getEntitiesOfClass(Display.class, new AABB(-100, -64, -100, 100, 320, 100)).size();
+					for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new AABB(-100, -64, -100, 100, 320, 100))) {
+						if (e.getItem().is(net.minecraft.world.item.Items.ITEM_FRAME)) {
+							frames += e.getItem().getCount();
+						}
+					}
+				}
+				return new int[] {displays, frames};
+			});
+			System.out.println("[gizmo-test] converted display tagged=" + tagged + " after delete displays=" + del[0] + " droppedFrames=" + del[1]
+					+ (tagged && del[0] == 1 && del[1] == 1 ? " PASS" : " FAIL expected tagged, 1 display left (the command-summoned one), 1 frame"));
+
 			// ---- item display through the browser, then a text display
 			for (int round = 0; round < 2; round++) {
 				boolean text = round == 1;
@@ -331,6 +361,14 @@ public class GizmoClientTest implements FabricClientGameTest {
 						}
 						return n;
 					}));
+
+				// ---- unselected: centre markers for several displays (block, item, text)
+				context.runOnClient(mc -> GizmoController.selected = null);
+				sp.getServer().runCommand("tp Player0 9.5 -60 9.5");
+				context.waitTicks(10);
+				aimAt(context, new Vec3(9.5, -59.3, 3.5), 0, 0);
+				context.waitTicks(5);
+				context.takeScreenshot("16-centre-markers");
 		}
 	}
 }

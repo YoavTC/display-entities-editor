@@ -28,6 +28,9 @@ import org.joml.Vector3f;
  * the player must hold the wand (and be an operator unless the config allows everyone), near the display, and within rate limits.
  */
 public class DisplayEntitiesEditor implements ModInitializer {
+	/** Entity tag on displays this mod created from an item frame; only these drop an item frame when deleted. */
+	public static final String FROM_FRAME_TAG = "display_entities_editor.from_frame";
+
 	public static final String MOD_ID = "display_entities_editor";
 	public static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(MOD_ID);
 
@@ -62,7 +65,10 @@ public class DisplayEntitiesEditor implements ModInitializer {
 			UUID id = handler.getPlayer().getUUID();
 			LAST_DENIED.remove(id);
 			RATE.keySet().removeIf(k -> k.startsWith(id + "/"));
+			EditSmoothing.playerLeft(id);
 		});
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> EditSmoothing.tick());
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPING.register(server -> EditSmoothing.restoreAll());
 	}
 
 	private static void deny(ServerPlayer player, String message) {
@@ -153,6 +159,7 @@ public class DisplayEntitiesEditor implements ModInitializer {
 		Transformation next = new Transformation(
 				new Vector3f(old.translation()), left, new Vector3f(p.sx(), p.sy(), p.sz()), new Quaternionf(old.rightRotation()));
 
+		EditSmoothing.touch(player, display);
 		display.setTransformation(next);
 		display.setPos(p.x(), p.y(), p.z());
 	}
