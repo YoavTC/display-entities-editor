@@ -188,6 +188,7 @@ public final class GizmoController {
 			return;
 		}
 		resolvePendingSelect(mc);
+		holdPreview();
 		if (selected != null && (selected.isRemoved() || selected.level() != mc.level)) {
 			selected = null;
 			cancelDrag();
@@ -318,6 +319,30 @@ public final class GizmoController {
 				new Quaternionf(old.rightRotation())));
 		d.setPos(p.x, p.y, p.z);
 		d.setOldPosAndRot();
+		// Server position updates interpolate (smooth for other viewers); keep them from dragging our local preview around.
+		d.getInterpolation().cancel();
+		holdDisplay = d;
+		holdPos = p;
+		holdUntilMs = System.currentTimeMillis() + PREVIEW_HOLD_MS;
+	}
+
+	private static final long PREVIEW_HOLD_MS = 500;
+	private static Display holdDisplay;
+	private static Vec3 holdPos;
+	private static long holdUntilMs;
+
+	/** After an edit the server's (lagging, interpolated) position syncs back; keep showing our own until it caught up. */
+	private static void holdPreview() {
+		if (holdDisplay == null) {
+			return;
+		}
+		if (System.currentTimeMillis() > holdUntilMs || holdDisplay.isRemoved()) {
+			holdDisplay = null;
+			return;
+		}
+		holdDisplay.getInterpolation().cancel();
+		holdDisplay.setPos(holdPos.x, holdPos.y, holdPos.z);
+		holdDisplay.setOldPosAndRot();
 	}
 
 	private static void send() {
