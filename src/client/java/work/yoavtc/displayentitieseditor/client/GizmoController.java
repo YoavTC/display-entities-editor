@@ -537,16 +537,43 @@ public final class GizmoController {
 		return best;
 	}
 
+	/** Visual centre of a display in world space (the mean of its transformed box corners). */
+	private static Vec3 displayCentre(Display d) {
+		Transformation t = Display.createTransformation(d.getEntityData());
+		Vec3[] c = localCorners(d, d.position(), t, new Quaternionf(t.leftRotation()), new Vector3f(t.scale()));
+		Vec3 centre = Vec3.ZERO;
+		for (Vec3 v : c) {
+			centre = centre.add(v);
+		}
+		return centre.scale(1.0 / c.length);
+	}
+
+	/**
+	 * The display the player is looking at. Many displays can overlap or sit close together, so instead of taking
+	 * the first box the ray enters, take the display whose centre (the marker shown while nothing is selected) is
+	 * closest to the look ray. A display qualifies if the ray passes through its box or close to its centre marker.
+	 */
 	private static Display pickDisplay(Minecraft mc, Vec3 ro, Vec3 rd) {
 		AABB search = new AABB(ro, ro.add(rd.scale(RAY_RANGE))).inflate(8);
 		List<Display> displays = mc.level.getEntitiesOfClass(Display.class, search);
 		Display best = null;
-		double bestT = Double.MAX_VALUE;
+		double bestScore = Double.MAX_VALUE;
 		for (Display d : displays) {
-			AABB box = worldBounds(d).inflate(0.05);
-			double t = rayAabb(ro, rd, box);
-			if (t >= 0 && t < bestT) {
-				bestT = t;
+			Vec3 toCentre = displayCentre(d).subtract(ro);
+			double along = toCentre.dot(rd);
+			boolean inBox = rayAabb(ro, rd, worldBounds(d).inflate(0.05)) >= 0;
+			if (along < 0 && !inBox) {
+				continue;
+			}
+			double off = toCentre.subtract(rd.scale(along)).length();
+			// aiming right at the centre marker counts even if the ray just misses a very small box
+			boolean onMarker = along >= 0 && along <= RAY_RANGE && off < 0.05 * along + 0.04;
+			if (!inBox && !onMarker) {
+				continue;
+			}
+			double score = off + along * 1.0e-4; // nearer wins an exact tie
+			if (score < bestScore) {
+				bestScore = score;
 				best = d;
 			}
 		}
@@ -651,13 +678,7 @@ public final class GizmoController {
 	private static void highlightNearby(Minecraft mc, Vec3 ro, Vec3 rd) {
 		Display target = pickDisplay(mc, ro, rd);
 		for (Display d : mc.level.getEntitiesOfClass(Display.class, new AABB(ro, ro).inflate(HIGHLIGHT_RADIUS))) {
-			Transformation t = Display.createTransformation(d.getEntityData());
-			Vec3[] c = localCorners(d, d.position(), t, new Quaternionf(t.leftRotation()), new Vector3f(t.scale()));
-			Vec3 centre = Vec3.ZERO;
-			for (Vec3 v : c) {
-				centre = centre.add(v);
-			}
-			centre = centre.scale(1.0 / c.length);
+			Vec3 centre = displayCentre(d);
 			boolean hot = d == target;
 			double h = ro.distanceTo(centre) * (hot ? 0.025 : 0.016);
 			int color = hot ? 0xFFFFFFFF : 0xFF55DDFF;
