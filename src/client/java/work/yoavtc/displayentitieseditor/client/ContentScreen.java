@@ -10,12 +10,14 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
+import work.yoavtc.displayentitieseditor.net.QuickActionPayload;
 
 /** Second prompt: what text / block / item should the new display show? */
 public class ContentScreen extends Screen {
 	private final String hint;
 	private final Consumer<String> onConfirm;
 	private final Supplier<Screen> back;
+	private final int maxLength;
 	private EditBox input;
 
 	public ContentScreen(Kind kind, Consumer<String> onConfirm, Supplier<Screen> back) {
@@ -31,7 +33,12 @@ public class ContentScreen extends Screen {
 	}
 
 	public ContentScreen(String title, String hint, Consumer<String> onConfirm, Supplier<Screen> back) {
+		this(title, hint, QuickActionPayload.SHORT_ARG, onConfirm, back);
+	}
+
+	public ContentScreen(String title, String hint, int maxLength, Consumer<String> onConfirm, Supplier<Screen> back) {
 		super(Component.literal(title));
+		this.maxLength = maxLength;
 		this.hint = hint;
 		this.onConfirm = onConfirm;
 		this.back = back;
@@ -43,7 +50,7 @@ public class ContentScreen extends Screen {
 		int x = (width - w) / 2;
 		int y = height / 2 - 20;
 		input = new EditBox(font, x, y, w, 20, title);
-		input.setMaxLength(work.yoavtc.displayentitieseditor.net.QuickActionPayload.MAX_ARG);
+		input.setMaxLength(maxLength);
 		input.setHint(Component.literal(hint));
 		addRenderableWidget(input);
 		addRenderableWidget(Button.builder(Component.literal("Confirm"), b -> confirm()).bounds(x, y + 28, w / 2 - 2, 20).build());

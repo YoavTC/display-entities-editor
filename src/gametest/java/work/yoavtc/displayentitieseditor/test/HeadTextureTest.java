@@ -42,6 +42,24 @@ public class HeadTextureTest implements FabricClientGameTest {
 		});
 	}
 
+	/** A valid Base64 skin value of about {@code chars} characters (JSON with a long padding field). */
+	private static String longValue(int chars) {
+		int payloadBytes = chars / 4 * 3;
+		String json = "{\"textures\":{\"SKIN\":{\"url\":\"http://textures.minecraft.net/texture/abc123\"}},\"pad\":\""
+				+ "x".repeat(Math.max(0, payloadBytes - 90)) + "\"}";
+		return java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+	}
+
+	private static int valueLength(TestSingleplayerContext sp) {
+		String nbt = itemNbt(sp);
+		int i = nbt.indexOf("value:\"");
+		if (i < 0) {
+			return -1;
+		}
+		int j = nbt.indexOf('"', i + 7);
+		return j - (i + 7);
+	}
+
 	private static void sneakClick(ClientGameTestContext context, Vec3 target) {
 		context.runOnClient(mc -> KeyMapping.set(mc.options.keyShift.getDefaultKey(), true));
 		context.waitTicks(4);
@@ -95,6 +113,35 @@ public class HeadTextureTest implements FabricClientGameTest {
 			context.clickScreenButton("Confirm");
 			context.waitTicks(20);
 			System.out.println("[head-test] after invalid: " + itemNbt(sp) + " (expect unchanged)");
+
+			// ---- long values: typed through the screen (over the old 2048 limit), then forged larger ones
+			sp.getServer().runCommand("data modify entity @e[type=minecraft:item_display,limit=1] item set value {id:\"minecraft:player_head\",count:1}");
+			context.waitTicks(10);
+			String big3k = longValue(3000);
+			sneakClick(context, center);
+			context.clickScreenButton("Set Texture");
+			context.waitForScreen(ContentScreen.class);
+			context.getInput().typeChars(big3k);
+			context.waitTicks(3);
+			context.clickScreenButton("Confirm");
+			context.waitTicks(20);
+			System.out.println("[head-test] typed " + big3k.length() + " chars -> stored " + valueLength(sp) + " chars");
+
+			int id = sp.getServer().computeOnServer(server -> {
+				for (var level : server.getAllLevels()) {
+					for (Display d : level.getEntitiesOfClass(Display.class, ALL)) {
+						return d.getId();
+					}
+				}
+				return -1;
+			});
+			for (int size : new int[] {20000, 32760, 32800, 100000}) {
+				String v = longValue(size);
+				context.runOnClient(mc -> net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+						new work.yoavtc.displayentitieseditor.net.QuickActionPayload(id, work.yoavtc.displayentitieseditor.net.QuickActionPayload.Action.SET_TEXTURE, v)));
+				context.waitTicks(20);
+				System.out.println("[head-test] forged " + v.length() + " chars -> stored " + valueLength(sp) + " chars; item starts: " + itemNbt(sp).substring(0, Math.min(90, itemNbt(sp).length())));
+			}
 
 			// the option is hidden for non-head items
 			sp.getServer().runCommand("data modify entity @e[type=minecraft:item_display,limit=1] item set value {id:\"minecraft:diamond\",count:1}");

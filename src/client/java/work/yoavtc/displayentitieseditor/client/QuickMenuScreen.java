@@ -56,7 +56,7 @@ public class QuickMenuScreen extends Screen {
 		int row = 24;
 		if (playerHead) {
 			addRenderableWidget(button("Set Texture", y + row, () -> minecraft.setScreenAndShow(
-					new ContentScreen("Head texture (Base64 value or textures.minecraft.net URL)", "eyJ0ZXh0dXJlcyI6...",
+					new ContentScreen("Head texture (Base64 value or textures.minecraft.net URL)", "eyJ0ZXh0dXJlcyI6...", QuickActionPayload.MAX_ARG,
 							value -> send(Action.SET_TEXTURE, value), back))));
 			row += 24;
 		}

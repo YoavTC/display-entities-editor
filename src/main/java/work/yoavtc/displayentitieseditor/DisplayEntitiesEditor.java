@@ -51,7 +51,8 @@ public class DisplayEntitiesEditor implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		PayloadTypeRegistry.serverboundPlay().register(TransformPayload.TYPE, TransformPayload.CODEC);
-		PayloadTypeRegistry.serverboundPlay().register(QuickActionPayload.TYPE, QuickActionPayload.CODEC);
+		// large payload: Base64 skin values can be far longer than the default 32 KiB packet budget allows for other mods' data
+		PayloadTypeRegistry.serverboundPlay().registerLarge(QuickActionPayload.TYPE, QuickActionPayload.CODEC, QuickActionPayload.MAX_BYTES);
 		PayloadTypeRegistry.clientboundPlay().register(SelectPayload.TYPE, SelectPayload.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(OpenMenuPayload.TYPE, OpenMenuPayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(CreateDisplayPayload.TYPE, CreateDisplayPayload.CODEC);

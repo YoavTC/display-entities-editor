@@ -43,6 +43,10 @@ final class QuickActions {
 		if (display == null) {
 			return;
 		}
+		if (p.action() != QuickActionPayload.Action.SET_TEXTURE && p.arg().length() > QuickActionPayload.SHORT_ARG) {
+			tell(player, "That value is too long.");
+			return;
+		}
 		switch (p.action()) {
 			case DELETE -> delete(player, display);
 			case RESET_SCALE -> retransform(display, t -> new Transformation(new Vector3f(t.translation()),
@@ -87,6 +91,12 @@ final class QuickActions {
 					return;
 				}
 				String value = textureValue(p.arg());
+				if (value != null && value.length() > MAX_PROFILE_VALUE) {
+					// vanilla drops the whole profile component when a property value is longer than this
+					tell(player, "That texture value is " + value.length() + " characters; Minecraft itself only allows up to "
+							+ MAX_PROFILE_VALUE + ", so the head was left unchanged.");
+					return;
+				}
 				if (value == null) {
 					tell(player, "Invalid texture: use the Base64 texture value or a textures.minecraft.net URL.");
 					return;
@@ -122,7 +132,8 @@ final class QuickActions {
 			String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + arg + "\"}}}";
 			return java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 		}
-		if (arg.isEmpty() || arg.length() > 1800 || !arg.matches("[A-Za-z0-9+/]+={0,2}")) {
+		// no length limit: skin values can be very long. Validate the alphabet by hand (no regex on huge input).
+		if (arg.isEmpty() || !isBase64(arg)) {
 			return null;
 		}
 		try {
@@ -131,6 +142,23 @@ final class QuickActions {
 		} catch (IllegalArgumentException e) {
 			return null;
 		}
+	}
+
+	/** Minecraft's own limit for a profile property value (longer values make the item lose its profile). */
+	static final int MAX_PROFILE_VALUE = 32767;
+
+	private static boolean isBase64(String s) {
+		int end = s.length();
+		while (end > 0 && s.charAt(end - 1) == '=' && s.length() - end < 2) {
+			end--;
+		}
+		for (int i = 0; i < end; i++) {
+			char c = s.charAt(i);
+			if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '+' || c == '/')) {
+				return false;
+			}
+		}
+		return end > 0;
 	}
 
 	private static void delete(ServerPlayer player, Display display) {
