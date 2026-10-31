@@ -42,7 +42,7 @@ public final class GizmoController {
 	private static final int CENTER_COLOR = 0xFFFFB0B0;
 	private static final int CENTER_HOVER = 0xFFFFFFFF;
 	private static final int RING_SEGMENTS = 64;
-	private static final double HIGHLIGHT_RADIUS = 32;
+	private static final double HIGHLIGHT_RADIUS = 8;
 	/** How far the editing ray travels: nothing beyond this distance from the camera can be picked, hovered or dragged. */
 	private static final double RAY_RANGE = 5.0;
 
