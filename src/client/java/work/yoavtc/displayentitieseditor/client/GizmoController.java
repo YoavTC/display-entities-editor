@@ -712,12 +712,31 @@ public final class GizmoController {
 	}
 
 	/** With nothing selected, mark the visual centre of every display near the player; the one under the crosshair is bigger and white. */
+	/** Line-of-sight results for the markers, refreshed a few times a second so many displays stay cheap. */
+	private static final java.util.Map<Integer, Boolean> MARKER_VISIBLE = new java.util.HashMap<>();
+	private static long markerVisibleStamp;
+
 	private static void highlightNearby(Minecraft mc, Vec3 ro, Vec3 rd) {
 		Display target = pickDisplay(mc, ro, rd);
+		long now = System.currentTimeMillis();
+		if (now - markerVisibleStamp > 100) {
+			MARKER_VISIBLE.clear();
+			markerVisibleStamp = now;
+		}
 		for (Display d : mc.level.getEntitiesOfClass(Display.class, new AABB(ro, ro).inflate(HIGHLIGHT_RADIUS))) {
 			Vec3 centre = displayCentre(d);
+			double dist = ro.distanceTo(centre);
+			if (dist > HIGHLIGHT_RADIUS) {
+				continue;
+			}
+			// only displays the player can actually see (no solid block between the camera and the display's centre)
+			boolean visible = d == target || MARKER_VISIBLE.computeIfAbsent(d.getId(),
+					id -> dist < 1.0e-3 || hasLineOfSight(mc, ro, centre.subtract(ro).scale(1.0 / dist), dist));
+			if (!visible) {
+				continue;
+			}
 			boolean hot = d == target;
-			double h = ro.distanceTo(centre) * (hot ? 0.025 : 0.016);
+			double h = dist * (hot ? 0.025 : 0.016);
 			int color = hot ? 0xFFFFFFFF : 0xFF55DDFF;
 			emit(Gizmos.cuboid(new AABB(centre.x - h, centre.y - h, centre.z - h, centre.x + h, centre.y + h, centre.z + h),
 				GizmoStyle.strokeAndFill(color, scaled(hot ? 2f : 1f), color)));
