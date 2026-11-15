@@ -280,6 +280,11 @@ public final class GizmoController {
 
 	// ------------------------------------------------------------------ entity state
 
+	/** Text displays are flat, so they have no depth (local Z) axis to scale. */
+	private static boolean hasDepth() {
+		return !(selected instanceof Display.TextDisplay);
+	}
+
 	/** World offset from the entity position to the visual centre of the display (the gizmo pivot). */
 	private static Vec3 pivotOffset(Quaternionf l, Vector3f s) {
 		float c = selected instanceof Display.BlockDisplay ? 0.5f : 0f;
@@ -479,7 +484,7 @@ public final class GizmoController {
 						return;
 					}
 					double factor = p.subtract(o0).length() / dragT0;
-					for (int i = 0; i < 3; i++) {
+					for (int i = 0; i < (hasDepth() ? 3 : 2); i++) {
 						ns.setComponent(i, (float) snap(s.scale.get(i) * factor, step));
 					}
 				} else {
@@ -540,6 +545,9 @@ public final class GizmoController {
 		int best = -1;
 		double bestScore = Double.MAX_VALUE;
 		for (int i = 0; i < 3; i++) {
+			if (i == 2 && mode == Mode.SCALE && !hasDepth()) {
+				continue; // flat text: no depth handle to grab
+			}
 			if (mode == Mode.ROTATE) {
 				double[] r = ringClosest(ro, rd, o, i, size * 0.9, 0, Math.PI, false);
 				if (r != null && r[1] < thr && r[1] < bestScore) {
@@ -621,12 +629,15 @@ public final class GizmoController {
 		boolean block = d instanceof Display.BlockDisplay;
 		double lo = block ? 0 : -0.5;
 		double hi = block ? 1 : 0.5;
+		boolean flat = d instanceof Display.TextDisplay; // text has no thickness: keep its box paper thin
+		double zlo = flat ? -0.01 : lo;
+		double zhi = flat ? 0.01 : hi;
 		Transformation tr = new Transformation(new Vector3f(t.translation()), l, s, new Quaternionf(t.rightRotation()));
 		org.joml.Matrix4fc m = tr.getMatrix();
 		Vec3[] out = new Vec3[8];
 		for (int i = 0; i < 8; i++) {
 			Vector3f v = new Vector3f((float) ((i & 1) == 0 ? lo : hi), (float) ((i & 2) == 0 ? lo : hi),
-					(float) ((i & 4) == 0 ? lo : hi));
+					(float) ((i & 4) == 0 ? zlo : zhi));
 			m.transformPosition(v);
 			out[i] = origin.add(v.x, v.y, v.z);
 		}
@@ -682,7 +693,7 @@ public final class GizmoController {
 				}
 			}
 			case SCALE -> {
-				for (int i = 0; i < 3; i++) {
+				for (int i = 0; i < (hasDepth() ? 3 : 2); i++) {
 					int color = i == active ? HOVER_COLORS[i] : COLORS[i];
 					Vec3 a = localAxis(i);
 					line(o.subtract(a.scale(300)), o.add(a.scale(300)), color, 1.5f);

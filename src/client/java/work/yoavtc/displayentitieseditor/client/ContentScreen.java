@@ -18,18 +18,19 @@ public class ContentScreen extends Screen {
 	private final Consumer<String> onConfirm;
 	private final Supplier<Screen> back;
 	private final int maxLength;
+	private final String initial;
 	private EditBox input;
 
 	public ContentScreen(Kind kind, Consumer<String> onConfirm, Supplier<Screen> back) {
 		this(switch (kind) {
-			case TEXT -> "Text to display";
+			case TEXT -> "Text (plain, or tellraw-style JSON)";
 			case BLOCK -> "Block to display (e.g. minecraft:tnt)";
 			case ITEM -> "Item to display (e.g. minecraft:diamond)";
 		}, switch (kind) {
-			case TEXT -> "Hello world";
+			case TEXT -> "Hello or {\"text\":\"Hi\",\"color\":\"gold\"}";
 			case BLOCK -> "minecraft:tnt";
 			case ITEM -> "minecraft:diamond";
-		}, onConfirm, back);
+		}, QuickActionPayload.SHORT_ARG, onConfirm, back);
 	}
 
 	public ContentScreen(String title, String hint, Consumer<String> onConfirm, Supplier<Screen> back) {
@@ -37,7 +38,13 @@ public class ContentScreen extends Screen {
 	}
 
 	public ContentScreen(String title, String hint, int maxLength, Consumer<String> onConfirm, Supplier<Screen> back) {
+		this(title, hint, maxLength, "", onConfirm, back);
+	}
+
+	/** @param initial the value the input starts with (the current value when editing) */
+	public ContentScreen(String title, String hint, int maxLength, String initial, Consumer<String> onConfirm, Supplier<Screen> back) {
 		super(Component.literal(title));
+		this.initial = initial;
 		this.maxLength = maxLength;
 		this.hint = hint;
 		this.onConfirm = onConfirm;
@@ -46,12 +53,13 @@ public class ContentScreen extends Screen {
 
 	@Override
 	protected void init() {
-		int w = 240;
+		int w = Math.min(320, width - 20);
 		int x = (width - w) / 2;
 		int y = height / 2 - 20;
 		input = new EditBox(font, x, y, w, 20, title);
 		input.setMaxLength(maxLength);
 		input.setHint(Component.literal(hint));
+		input.setValue(initial);
 		addRenderableWidget(input);
 		addRenderableWidget(Button.builder(Component.literal("Confirm"), b -> confirm()).bounds(x, y + 28, w / 2 - 2, 20).build());
 		addRenderableWidget(Button.builder(Component.literal("Back"), b -> minecraft.setScreenAndShow(back.get()))

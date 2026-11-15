@@ -3,6 +3,8 @@ package work.yoavtc.displayentitieseditor;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.math.Transformation;
 import work.yoavtc.displayentitieseditor.net.QuickActionPayload;
+import work.yoavtc.displayentitieseditor.net.TextEditPayload;
+import work.yoavtc.displayentitieseditor.net.TextOptions;
 import java.util.Locale;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -32,6 +34,8 @@ final class QuickActions {
 	static void register() {
 		ServerPlayNetworking.registerGlobalReceiver(QuickActionPayload.TYPE, (payload, context) ->
 				context.server().execute(() -> apply(context.player(), payload)));
+		ServerPlayNetworking.registerGlobalReceiver(TextEditPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> editText(context.player(), payload)));
 	}
 
 	private static void tell(ServerPlayer player, String message) {
@@ -43,7 +47,8 @@ final class QuickActions {
 		if (display == null) {
 			return;
 		}
-		if (p.action() != QuickActionPayload.Action.SET_TEXTURE && p.arg().length() > QuickActionPayload.SHORT_ARG) {
+		int maxArg = p.action() == QuickActionPayload.Action.SET_TEXTURE ? QuickActionPayload.MAX_ARG : QuickActionPayload.SHORT_ARG;
+		if (p.arg().length() > maxArg) {
 			tell(player, "That value is too long.");
 			return;
 		}
@@ -105,12 +110,17 @@ final class QuickActions {
 				merge(player, display, "item", "{item:{id:\"minecraft:player_head\",count:1,components:{\"minecraft:profile\":"
 						+ "{properties:[{name:\"textures\",value:" + StringTag.quoteAndEscape(value) + "}]}}}}");
 			}
-			case SET_TEXT -> {
-				if (!(display instanceof Display.TextDisplay) || p.arg().isBlank()) {
-					return;
+			case CYCLE_BILLBOARD -> modify(player, display, tag -> {
+				String[] modes = TextOptions.BILLBOARDS;
+				String current = tag.getStringOr("billboard", "fixed");
+				int index = 0;
+				for (int k = 0; k < modes.length; k++) {
+					if (modes[k].equals(current)) {
+						index = k;
+					}
 				}
-				merge(player, display, "text", "{text:" + StringTag.quoteAndEscape(p.arg()) + "}");
-			}
+				tag.putString("billboard", modes[(index + 1) % modes.length]);
+			});
 		}
 	}
 
@@ -161,6 +171,23 @@ final class QuickActions {
 		return end > 0;
 	}
 
+	/** Applies a new text (plain or tellraw-style JSON) and all text options in one go. */
+	private static void editText(ServerPlayer player, TextEditPayload p) {
+		Display display = DisplayEntitiesEditor.findEditable(player, p.entityId());
+		if (display == null || !(display instanceof Display.TextDisplay)) {
+			return;
+		}
+		TextComponents.Result text = TextComponents.parse(p.text(), player.level().registryAccess());
+		if (text.tag() == null) {
+			tell(player, text.error());
+			return;
+		}
+		modify(player, display, tag -> {
+			tag.put("text", text.tag());
+			p.options().applyTo(tag);
+		});
+	}
+
 	private static void delete(ServerPlayer player, Display display) {
 		ServerLevel level = player.level();
 		Vec3 at = center(display);
@@ -189,6 +216,16 @@ final class QuickActions {
 		display.setTransformation(change.apply(Display.createTransformation(display.getEntityData())));
 		Vec3 after = center(display);
 		display.setPos(display.position().add(before.subtract(after)));
+	}
+
+	/** Save the display to NBT, let {@code change} edit it, and load it back (what /data modify does). */
+	private static void modify(ServerPlayer player, Display display, java.util.function.Consumer<CompoundTag> change) {
+		ServerLevel level = player.level();
+		TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, level.registryAccess());
+		display.saveWithoutId(out);
+		CompoundTag tag = out.buildResult();
+		change.accept(tag);
+		display.load(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), tag));
 	}
 
 	/** Like /data merge for one top-level key: save, replace that key, load back. */

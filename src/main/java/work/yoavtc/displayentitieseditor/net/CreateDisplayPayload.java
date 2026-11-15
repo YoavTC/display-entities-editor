@@ -6,25 +6,30 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /** Client -> server: replace the item frame with a display of the given kind showing {@code content}. */
-public record CreateDisplayPayload(int frameId, Kind kind, String content) implements CustomPacketPayload {
+public record CreateDisplayPayload(int frameId, Kind kind, String content, TextOptions options) implements CustomPacketPayload {
 	public enum Kind {
 		TEXT, BLOCK, ITEM
 	}
 
-	public static final int MAX_CONTENT = 512;
+	public static final int MAX_CONTENT = 4096;
 	public static final Type<CreateDisplayPayload> TYPE = new Type<>(DisplayEntitiesEditor.id("create_display"));
 	public static final StreamCodec<RegistryFriendlyByteBuf, CreateDisplayPayload> CODEC = StreamCodec.of(
 			(buf, p) -> {
 				buf.writeVarInt(p.frameId);
 				buf.writeVarInt(p.kind.ordinal());
 				buf.writeUtf(p.content, MAX_CONTENT);
+				buf.writeBoolean(p.options != null);
+				if (p.options != null) {
+					TextOptions.write(buf, p.options);
+				}
 			},
 			buf -> {
 				int id = buf.readVarInt();
 				int kind = buf.readVarInt();
 				String content = buf.readUtf(MAX_CONTENT);
 				Kind[] kinds = Kind.values();
-				return new CreateDisplayPayload(id, kinds[Math.floorMod(kind, kinds.length)], content);
+				TextOptions options = buf.readBoolean() ? TextOptions.read(buf) : null;
+				return new CreateDisplayPayload(id, kinds[Math.floorMod(kind, kinds.length)], content, options);
 			});
 
 	@Override

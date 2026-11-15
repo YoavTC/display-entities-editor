@@ -28,9 +28,17 @@ public class ChooseTypeScreen extends Screen {
 
 	private void open(Kind kind) {
 		java.util.function.Consumer<String> create = value ->
-				net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new work.yoavtc.displayentitieseditor.net.CreateDisplayPayload(frameId, kind, value));
+				net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new work.yoavtc.displayentitieseditor.net.CreateDisplayPayload(frameId, kind, value, null));
 		java.util.function.Supplier<Screen> back = () -> new ChooseTypeScreen(frameId);
-		minecraft.setScreenAndShow(kind == Kind.TEXT ? new ContentScreen(kind, create, back) : new BrowserScreen(kind, create, back));
+		if (kind == Kind.TEXT) {
+			minecraft.setScreenAndShow(new TextEditScreen(null, (value, options) -> {
+				net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+						new work.yoavtc.displayentitieseditor.net.CreateDisplayPayload(frameId, kind, value, options));
+				onClose();
+			}, back));
+		} else {
+			minecraft.setScreenAndShow(new BrowserScreen(kind, create, back));
+		}
 	}
 
 	@Override

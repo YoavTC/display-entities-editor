@@ -94,7 +94,12 @@ final class FrameConversion {
 		switch (p.kind()) {
 			case TEXT -> {
 				type = EntityTypes.TEXT_DISPLAY;
-				snbt = uprightHead(frame, pos, 0.25) + ",text:" + StringTag.quoteAndEscape(content) + "}";
+				TextComponents.Result text = TextComponents.parse(content, player.level().registryAccess());
+				if (text.tag() == null) {
+					tell(player, text.error());
+					return;
+				}
+				snbt = uprightHead(frame, pos, 0.25) + ",text:" + text.tag() + "}";
 			}
 			case BLOCK -> {
 				Identifier id = parseId(content);
@@ -130,6 +135,9 @@ final class FrameConversion {
 		} catch (CommandSyntaxException e) {
 			tell(player, "Invalid value: " + content);
 			return;
+		}
+		if (p.kind() == CreateDisplayPayload.Kind.TEXT && p.options() != null) {
+			p.options().applyTo(tag); // must happen before the entity is built from the tag
 		}
 		Entity display = EntityType.create(type, TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), tag),
 				level, EntitySpawnReason.COMMAND).orElse(null);

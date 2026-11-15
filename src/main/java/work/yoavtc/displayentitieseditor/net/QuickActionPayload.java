@@ -8,7 +8,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 /** Client -> server: a one-shot action on a display entity (delete, change content, reset, align). */
 public record QuickActionPayload(int entityId, Action action, String arg) implements CustomPacketPayload {
 	public enum Action {
-		DELETE, SET_BLOCK, SET_ITEM, SET_TEXT, SET_TEXTURE, RESET_SCALE, RESET_ROTATION, ALIGN_TO_BLOCK
+		DELETE, SET_BLOCK, SET_ITEM, SET_TEXTURE, RESET_SCALE, RESET_ROTATION, ALIGN_TO_BLOCK, CYCLE_BILLBOARD
 	}
 
 	/** Longest argument the packet carries (characters). Only head textures may be this long; see {@link #SHORT_ARG}. */
