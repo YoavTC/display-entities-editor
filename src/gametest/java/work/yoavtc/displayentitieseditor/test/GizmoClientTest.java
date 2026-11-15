@@ -229,7 +229,7 @@ public class GizmoClientTest implements FabricClientGameTest {
 				context.waitForScreen(work.yoavtc.displayentitieseditor.client.ChooseTypeScreen.class);
 				if (text) {
 					context.clickScreenButton("Text Display");
-					context.waitForScreen(work.yoavtc.displayentitieseditor.client.ContentScreen.class);
+					context.waitForScreen(work.yoavtc.displayentitieseditor.client.TextEditScreen.class);
 					context.getInput().typeChars("Hello");
 					context.clickScreenButton("Confirm");
 				} else {
@@ -289,7 +289,7 @@ public class GizmoClientTest implements FabricClientGameTest {
 			});
 			context.waitForScreen(work.yoavtc.displayentitieseditor.client.ChooseTypeScreen.class);
 			context.clickScreenButton("Text Display");
-			context.waitForScreen(work.yoavtc.displayentitieseditor.client.ContentScreen.class);
+			context.waitForScreen(work.yoavtc.displayentitieseditor.client.TextEditScreen.class);
 			context.getInput().typeChars("Floor text");
 			context.clickScreenButton("Confirm");
 			context.waitTicks(20);
