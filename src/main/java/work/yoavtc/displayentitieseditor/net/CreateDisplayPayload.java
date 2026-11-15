@@ -11,7 +11,7 @@ public record CreateDisplayPayload(int frameId, Kind kind, String content) imple
 		TEXT, BLOCK, ITEM
 	}
 
-	public static final int MAX_CONTENT = 512;
+	public static final int MAX_CONTENT = 4096;
 	public static final Type<CreateDisplayPayload> TYPE = new Type<>(DisplayEntitiesEditor.id("create_display"));
 	public static final StreamCodec<RegistryFriendlyByteBuf, CreateDisplayPayload> CODEC = StreamCodec.of(
 			(buf, p) -> {

@@ -30,6 +30,22 @@ Config file available at `config/display_entities_editor.json` with the followin
 - `allow_non_operators` (default `true`): whether players without operator permission may edit displays. This is read by the server. Set it to `false` to require operator permission.
 - `line_width` (default `1.5`, range 0.5 - 10): base width of the lines the in-world editor draws (axes, rings, outlines). Read by the client; the thicker hover and drag highlights scale with it.
 
+## Text displays
+
+The text you give a text display (when creating one from an item frame, and in the quick menu's **Change Text**) works
+like `/tellraw`: plain text stays plain, and anything starting with `{`, `[` or `"` is read as a JSON text component
+(SNBT works too), so you get colours, bold, italic, underlined, strikethrough, obfuscated, fonts, `extra` parts and so on:
+
+```
+Hello
+{"text":"Hello","bold":true,"color":"gold"}
+["Plain ",{"text":"red and italic","color":"red","italic":true}]
+{"text":"Custom colour","color":"#ff55aa","shadow_color":-16777216}
+```
+
+Invalid components are refused with a chat message. The settings that are not part of the text live in the quick menu
+under **Text Options...**: toggle the background, the shadow and see-through, and cycle the alignment.
+
 ## Deleting displays
 
 Deleting a display (the Delete key or the quick menu) only drops an item frame for displays this mod created from an item frame. Those carry the entity tag `display_entities_editor.from_frame`, which is saved with the entity. Displays without the tag, such as ones summoned by command, are simply removed and drop nothing.

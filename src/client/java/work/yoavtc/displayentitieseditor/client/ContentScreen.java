@@ -22,14 +22,14 @@ public class ContentScreen extends Screen {
 
 	public ContentScreen(Kind kind, Consumer<String> onConfirm, Supplier<Screen> back) {
 		this(switch (kind) {
-			case TEXT -> "Text to display";
+			case TEXT -> "Text (plain, or tellraw-style JSON)";
 			case BLOCK -> "Block to display (e.g. minecraft:tnt)";
 			case ITEM -> "Item to display (e.g. minecraft:diamond)";
 		}, switch (kind) {
-			case TEXT -> "Hello world";
+			case TEXT -> "Hello or {\"text\":\"Hi\",\"color\":\"gold\"}";
 			case BLOCK -> "minecraft:tnt";
 			case ITEM -> "minecraft:diamond";
-		}, onConfirm, back);
+		}, kind == Kind.TEXT ? QuickActionPayload.TEXT_ARG : QuickActionPayload.SHORT_ARG, onConfirm, back);
 	}
 
 	public ContentScreen(String title, String hint, Consumer<String> onConfirm, Supplier<Screen> back) {
@@ -46,7 +46,7 @@ public class ContentScreen extends Screen {
 
 	@Override
 	protected void init() {
-		int w = 240;
+		int w = Math.min(320, width - 20);
 		int x = (width - w) / 2;
 		int y = height / 2 - 20;
 		input = new EditBox(font, x, y, w, 20, title);

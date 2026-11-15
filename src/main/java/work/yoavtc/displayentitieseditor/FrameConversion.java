@@ -94,7 +94,12 @@ final class FrameConversion {
 		switch (p.kind()) {
 			case TEXT -> {
 				type = EntityTypes.TEXT_DISPLAY;
-				snbt = uprightHead(frame, pos, 0.25) + ",text:" + StringTag.quoteAndEscape(content) + "}";
+				TextComponents.Result text = TextComponents.parse(content, player.level().registryAccess());
+				if (text.tag() == null) {
+					tell(player, text.error());
+					return;
+				}
+				snbt = uprightHead(frame, pos, 0.25) + ",text:" + text.tag() + "}";
 			}
 			case BLOCK -> {
 				Identifier id = parseId(content);

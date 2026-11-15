@@ -15,6 +15,10 @@ public class QuickMenuScreen extends Screen {
 	private final int entityId;
 	private final Kind kind;
 	private final boolean playerHead;
+	/** Head and text displays have one extra row (Set Texture / Text Options). */
+	private boolean extraRow() {
+		return playerHead || kind == Kind.TEXT;
+	}
 
 	public QuickMenuScreen(Display display) {
 		super(Component.literal("Display actions"));
@@ -40,7 +44,7 @@ public class QuickMenuScreen extends Screen {
 
 	@Override
 	protected void init() {
-		int y = height / 2 - (playerHead ? 92 : 80);
+		int y = height / 2 - (extraRow() ? 92 : 80);
 		java.util.function.Supplier<Screen> back = () -> {
 			var level = minecraft.level;
 			return level != null && level.getEntity(entityId) instanceof Display d ? new QuickMenuScreen(d) : null;
@@ -54,6 +58,11 @@ public class QuickMenuScreen extends Screen {
 					new ContentScreen(Kind.TEXT, text -> send(Action.SET_TEXT, text), back))));
 		}
 		int row = 24;
+		if (kind == Kind.TEXT) {
+			addRenderableWidget(button("Text Options...", y + row, () -> minecraft.setScreenAndShow(
+					new TextOptionsScreen(entityId, back))));
+			row += 24;
+		}
 		if (playerHead) {
 			addRenderableWidget(button("Set Texture", y + row, () -> minecraft.setScreenAndShow(
 					new ContentScreen("Head texture (Base64 value or textures.minecraft.net URL)", "eyJ0ZXh0dXJlcyI6...", QuickActionPayload.MAX_ARG,
@@ -75,7 +84,7 @@ public class QuickMenuScreen extends Screen {
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
 		super.extractRenderState(g, mouseX, mouseY, partialTick);
-		g.text(font, title, (width - font.width(title)) / 2, height / 2 - (playerHead ? 92 : 80) - 14, 0xFFFFFFFF, true);
+		g.text(font, title, (width - font.width(title)) / 2, height / 2 - (extraRow() ? 92 : 80) - 14, 0xFFFFFFFF, true);
 	}
 
 	@Override

@@ -43,7 +43,12 @@ final class QuickActions {
 		if (display == null) {
 			return;
 		}
-		if (p.action() != QuickActionPayload.Action.SET_TEXTURE && p.arg().length() > QuickActionPayload.SHORT_ARG) {
+		int maxArg = switch (p.action()) {
+			case SET_TEXTURE -> QuickActionPayload.MAX_ARG;
+			case SET_TEXT -> QuickActionPayload.TEXT_ARG;
+			default -> QuickActionPayload.SHORT_ARG;
+		};
+		if (p.arg().length() > maxArg) {
 			tell(player, "That value is too long.");
 			return;
 		}
@@ -106,10 +111,45 @@ final class QuickActions {
 						+ "{properties:[{name:\"textures\",value:" + StringTag.quoteAndEscape(value) + "}]}}}}");
 			}
 			case SET_TEXT -> {
-				if (!(display instanceof Display.TextDisplay) || p.arg().isBlank()) {
+				if (!(display instanceof Display.TextDisplay)) {
 					return;
 				}
-				merge(player, display, "text", "{text:" + StringTag.quoteAndEscape(p.arg()) + "}");
+				TextComponents.Result text = TextComponents.parse(p.arg(), player.level().registryAccess());
+				if (text.tag() == null) {
+					tell(player, text.error());
+					return;
+				}
+				modify(player, display, tag -> tag.put("text", text.tag()));
+			}
+			case TOGGLE_SHADOW -> {
+				if (display instanceof Display.TextDisplay) {
+					modify(player, display, tag -> tag.putBoolean("shadow", !tag.getBooleanOr("shadow", false)));
+				}
+			}
+			case TOGGLE_SEE_THROUGH -> {
+				if (display instanceof Display.TextDisplay) {
+					modify(player, display, tag -> tag.putBoolean("see_through", !tag.getBooleanOr("see_through", false)));
+				}
+			}
+			case TOGGLE_BACKGROUND -> {
+				if (display instanceof Display.TextDisplay) {
+					modify(player, display, tag -> {
+						// "no background" = not using the default colour and a fully transparent custom one
+						boolean transparent = !tag.getBooleanOr("default_background", false)
+								&& (tag.getInt("background").orElse(0x40000000) >>> 24) == 0;
+						tag.putBoolean("default_background", false);
+						tag.putInt("background", transparent ? 0x40000000 : 0);
+					});
+				}
+			}
+			case CYCLE_ALIGNMENT -> {
+				if (display instanceof Display.TextDisplay) {
+					modify(player, display, tag -> tag.putString("alignment", switch (tag.getStringOr("alignment", "center")) {
+						case "center" -> "left";
+						case "left" -> "right";
+						default -> "center";
+					}));
+				}
 			}
 		}
 	}
@@ -189,6 +229,16 @@ final class QuickActions {
 		display.setTransformation(change.apply(Display.createTransformation(display.getEntityData())));
 		Vec3 after = center(display);
 		display.setPos(display.position().add(before.subtract(after)));
+	}
+
+	/** Save the display to NBT, let {@code change} edit it, and load it back (what /data modify does). */
+	private static void modify(ServerPlayer player, Display display, java.util.function.Consumer<CompoundTag> change) {
+		ServerLevel level = player.level();
+		TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, level.registryAccess());
+		display.saveWithoutId(out);
+		CompoundTag tag = out.buildResult();
+		change.accept(tag);
+		display.load(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), tag));
 	}
 
 	/** Like /data merge for one top-level key: save, replace that key, load back. */
