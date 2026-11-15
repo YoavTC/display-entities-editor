@@ -136,6 +136,9 @@ final class FrameConversion {
 			tell(player, "Invalid value: " + content);
 			return;
 		}
+		if (p.kind() == CreateDisplayPayload.Kind.TEXT && p.options() != null) {
+			p.options().applyTo(tag); // must happen before the entity is built from the tag
+		}
 		Entity display = EntityType.create(type, TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), tag),
 				level, EntitySpawnReason.COMMAND).orElse(null);
 		if (display == null) {
@@ -143,9 +146,6 @@ final class FrameConversion {
 			return;
 		}
 		display.addTag(DisplayEntitiesEditor.FROM_FRAME_TAG);
-		if (p.kind() == CreateDisplayPayload.Kind.TEXT && p.options() != null) {
-			p.options().applyTo(tag);
-		}
 		frame.discard();
 		if (level.addFreshEntity(display)) {
 			ServerPlayNetworking.send(player, new SelectPayload(display.getId()));
