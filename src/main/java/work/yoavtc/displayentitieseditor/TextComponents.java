@@ -23,12 +23,12 @@ import net.minecraft.resources.RegistryOps;
  * {@code "quoted"}) or the SNBT form of one. Anything that does not start with {@code {}, {@code [} or {@code "}
  * is plain literal text.
  */
-final class TextComponents {
+public final class TextComponents {
 	private TextComponents() {
 	}
 
 	/** Result of {@link #parse}: either the tag to store or a human readable error. */
-	record Result(Tag tag, String error) {
+	public record Result(Tag tag, String error) {
 		static Result ok(Tag tag) {
 			return new Result(tag, null);
 		}
@@ -38,7 +38,32 @@ final class TextComponents {
 		}
 	}
 
-	static Result parse(String raw, HolderLookup.Provider registries) {
+	/**
+	 * The text of a component as the create/edit screen shows it: plain text when it has no formatting, otherwise
+	 * its JSON. The inverse of {@link #parse}.
+	 */
+	public static String toEditable(Component component, HolderLookup.Provider registries) {
+		JsonElement json = ComponentSerialization.CODEC.encodeStart(RegistryOps.create(JsonOps.INSTANCE, registries), component)
+				.result().orElse(null);
+		if (json == null) {
+			return component.getString();
+		}
+		String plain = null;
+		if (json.isJsonPrimitive() && json.getAsJsonPrimitive().isString()) {
+			plain = json.getAsString();
+		} else if (json.isJsonObject() && json.getAsJsonObject().size() == 1 && json.getAsJsonObject().has("text")
+				&& json.getAsJsonObject().get("text").isJsonPrimitive()) {
+			plain = json.getAsJsonObject().get("text").getAsString();
+		}
+		if (plain != null) {
+			char first = plain.isEmpty() ? 'x' : plain.charAt(0);
+			boolean safe = !plain.isEmpty() && plain.indexOf('\n') < 0 && first != '{' && first != '[' && first != '"';
+			return safe ? plain : new com.google.gson.JsonPrimitive(plain).toString();
+		}
+		return json.toString();
+	}
+
+	public static Result parse(String raw, HolderLookup.Provider registries) {
 		String input = raw.strip();
 		if (input.isEmpty()) {
 			return Result.error("Nothing to display.");

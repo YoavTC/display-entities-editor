@@ -43,8 +43,16 @@ Hello
 {"text":"Custom colour","color":"#ff55aa","shadow_color":-16777216}
 ```
 
-Invalid components are refused with a chat message. The settings that are not part of the text live in the quick menu
-under **Text Options...**: toggle the background, the shadow and see-through, and cycle the alignment.
+Invalid components are refused with a chat message.
+
+The create screen (item frame -> Text Display) and the edit screen (sneak-click a text display -> **Edit Text & Options**)
+are the same screen: besides the text it has **Background** (on/off) and **Background RGB** (hex colour), **Shadow**,
+**Alignment**, **Billboard** (fixed / vertical / horizontal / center) and **Text opacity** (0-255). When editing, every
+field starts with the display's current value. A button opens the
+[raw JSON text generator](https://www.gamergeeks.net/apps/minecraft/raw-json-text-format-generator) in your browser
+(after a confirmation). Billboard can also be cycled for block and item displays from the quick menu.
+
+Text is flat, so a text display has no depth handle when scaling and its selection box is paper thin.
 
 ## Deleting displays
 

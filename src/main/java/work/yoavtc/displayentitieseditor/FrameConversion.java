@@ -143,6 +143,9 @@ final class FrameConversion {
 			return;
 		}
 		display.addTag(DisplayEntitiesEditor.FROM_FRAME_TAG);
+		if (p.kind() == CreateDisplayPayload.Kind.TEXT && p.options() != null) {
+			p.options().applyTo(tag);
+		}
 		frame.discard();
 		if (level.addFreshEntity(display)) {
 			ServerPlayNetworking.send(player, new SelectPayload(display.getId()));

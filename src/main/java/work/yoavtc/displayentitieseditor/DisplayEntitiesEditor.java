@@ -5,6 +5,7 @@ import work.yoavtc.displayentitieseditor.net.CreateDisplayPayload;
 import work.yoavtc.displayentitieseditor.net.OpenMenuPayload;
 import work.yoavtc.displayentitieseditor.net.QuickActionPayload;
 import work.yoavtc.displayentitieseditor.net.SelectPayload;
+import work.yoavtc.displayentitieseditor.net.TextEditPayload;
 import work.yoavtc.displayentitieseditor.net.TransformPayload;
 import java.util.HashMap;
 import java.util.Map;
@@ -52,6 +53,7 @@ public class DisplayEntitiesEditor implements ModInitializer {
 	public void onInitialize() {
 		PayloadTypeRegistry.serverboundPlay().register(TransformPayload.TYPE, TransformPayload.CODEC);
 		// large payload: Base64 skin values can be far longer than the default 32 KiB packet budget allows for other mods' data
+		PayloadTypeRegistry.serverboundPlay().register(TextEditPayload.TYPE, TextEditPayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().registerLarge(QuickActionPayload.TYPE, QuickActionPayload.CODEC, QuickActionPayload.MAX_BYTES);
 		PayloadTypeRegistry.clientboundPlay().register(SelectPayload.TYPE, SelectPayload.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(OpenMenuPayload.TYPE, OpenMenuPayload.CODEC);
