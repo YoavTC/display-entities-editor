@@ -4,8 +4,12 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.math.Transformation;
 import work.yoavtc.displayentitieseditor.net.QuickActionPayload;
 import work.yoavtc.displayentitieseditor.net.TransformPayload;
+import work.yoavtc.displayentitieseditor.net.TransformResultPayload;
 import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import work.yoavtc.displayentitieseditor.DisplayEntitiesEditorConfig;
 import net.minecraft.client.Camera;
@@ -18,7 +22,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
 /** All editor state and per-frame logic: picking, handle hit-testing, dragging, and gizmo drawing. */
 public final class GizmoController {
@@ -71,7 +77,6 @@ public final class GizmoController {
 	private static boolean lastRmb;
 	private static boolean lastDelete;
 	private static boolean lastUndo;
-	private static long lastSendMs;
 	private static int pendingSelectId = -1;
 	private static long pendingSelectUntilMs;
 
@@ -171,8 +176,7 @@ public final class GizmoController {
 			}
 		}
 		commitUndo();
-		applyPreview();
-		send();
+		applyPreview(NUDGE_SEND_DELAY_MS);
 		return true;
 	}
 
@@ -180,6 +184,7 @@ public final class GizmoController {
 
 	public static void frame(Camera cam) {
 		Minecraft mc = Minecraft.getInstance();
+		updateLocalEdits();
 		if (!active || mc.player == null || mc.level == null || !mc.mouseHandler.isMouseGrabbed()) {
 			if (dragHandle >= 0) {
 				cancelDrag();
@@ -188,7 +193,6 @@ public final class GizmoController {
 			return;
 		}
 		resolvePendingSelect(mc);
-		holdPreview();
 		if (selected != null && (selected.isRemoved() || selected.level() != mc.level)) {
 			selected = null;
 			cancelDrag();
@@ -306,57 +310,243 @@ public final class GizmoController {
 		Transformation t = Display.createTransformation(selected.getEntityData());
 		translation = new Vector3f(t.translation());
 		rightRot = new Quaternionf(t.rightRotation());
+		LocalEdit e = localEdit(selected);
+		if (e != null) {
+			// the entity may still be easing toward the edit; the gizmo works with where it is going
+			pos = e.pos;
+			left = new Quaternionf(e.left);
+			scale = new Vector3f(e.scale);
+			return;
+		}
 		pos = selected.position();
 		left = new Quaternionf(t.leftRotation());
 		scale = new Vector3f(t.scale());
 	}
 
-	private static void applyPreview() {
-		applyTo(selected, pos, left, scale);
+	// ------------------------------------------------------------------ local edits, confirmed by the server
+
+	/** Passed as a send delay: keep the change local for now (a drag in progress); it is sent when the drag ends. */
+	private static final long HOLD = -1;
+	/** Scroll nudges in quick succession are sent as one change once the wheel has been still this long. */
+	private static final long NUDGE_SEND_DELAY_MS = 150;
+	/** If the server never answers (display gone or out of reach), fall back to its last known state after this long. */
+	private static final long CONFIRM_TIMEOUT_MS = 3000;
+	/**
+	 * Time constant of the visual smoothing, in seconds: each frame the drawn display closes the same fraction of
+	 * the gap to the edit target (about 95% after three time constants), independent of the frame rate.
+	 */
+	private static final double SMOOTHING_SECONDS = 0.03;
+
+	/**
+	 * A display this client changed and the server has not confirmed yet. Edits show up locally right away and only
+	 * the end result is sent. Until the server answers, this state is kept on the entity, so older updates the
+	 * server is still syncing to us cannot pull the preview back.
+	 * <p>
+	 * What is drawn ("shown") eases toward the edit target instead of jumping to it, which hides mouse jitter and
+	 * snapping steps. The target is what the gizmo works with and what is sent to the server.
+	 */
+	private static final class LocalEdit {
+		final Display display;
+		/** The display as the server last had it, shown again if the server never answers. */
+		Vec3 basePos;
+		Quaternionf baseLeft;
+		Vector3f baseScale;
+		/** The edit target. */
+		Vec3 pos;
+		Quaternionf left;
+		Vector3f scale;
+		/** What is drawn right now; the pivot (visual centre) is eased rather than the position, so rotations stay centred. */
+		Vec3 shownPivot;
+		final Quaternionf shownLeft;
+		final Vector3f shownScale;
+		long lastStepNanos = System.nanoTime();
+		/** A change exists that the server has not been sent yet. */
+		boolean unsent;
+		/** When the unsent change goes out (Long.MAX_VALUE: held until the drag ends). */
+		long sendAtMs = Long.MAX_VALUE;
+		/** Sequence number of the last send; the server's answer carries it back. */
+		int sentSeq;
+		long sentAtMs;
+		/** The server answered the last send; the entry is dropped as soon as the drawn state has caught up. */
+		boolean confirmed;
+
+		LocalEdit(Display d) {
+			display = d;
+			Transformation t = Display.createTransformation(d.getEntityData());
+			basePos = d.position();
+			baseLeft = new Quaternionf(t.leftRotation());
+			baseScale = new Vector3f(t.scale());
+			pos = basePos;
+			left = new Quaternionf(baseLeft);
+			scale = new Vector3f(baseScale);
+			shownLeft = new Quaternionf(baseLeft);
+			shownScale = new Vector3f(baseScale);
+			shownPivot = basePos.add(pivotOffsetFor(d, shownLeft, shownScale));
+		}
+
+		void retarget(Vec3 p, Quaternionfc l, Vector3fc s) {
+			pos = p;
+			left = new Quaternionf(l);
+			scale = new Vector3f(s);
+		}
 	}
 
-	private static void applyTo(Display d, Vec3 p, Quaternionf l, Vector3f s) {
+	/** World offset from a display's position to its visual centre, for a given left rotation and scale. */
+	private static Vec3 pivotOffsetFor(Display d, Quaternionfc l, Vector3fc s) {
+		Transformation t = Display.createTransformation(d.getEntityData());
+		float c = d instanceof Display.BlockDisplay ? 0.5f : 0f;
+		Vector3f v = new Vector3f(c, c, c);
+		new org.joml.Matrix4f().translation(t.translation()).rotate(l).scale(s).rotate(t.rightRotation()).transformPosition(v);
+		return new Vec3(v.x, v.y, v.z);
+	}
+
+	/**
+	 * Moves what is drawn one frame's worth toward the target and writes it onto the entity.
+	 * Returns true once it has arrived (it then shows the target exactly).
+	 */
+	private static boolean step(LocalEdit e) {
+		long now = System.nanoTime();
+		double dt = Math.max(0, (now - e.lastStepNanos) / 1.0e9);
+		e.lastStepNanos = now;
+		Vec3 targetPivot = e.pos.add(pivotOffsetFor(e.display, e.left, e.scale));
+		float a = (float) (1 - Math.exp(-dt / SMOOTHING_SECONDS));
+		e.shownPivot = e.shownPivot.lerp(targetPivot, a);
+		e.shownLeft.slerp(e.left, a).normalize();
+		e.shownScale.lerp(e.scale, a);
+		boolean arrived = e.shownPivot.distanceToSqr(targetPivot) < 1.0e-8
+				&& Math.abs(e.shownLeft.dot(e.left)) > 1 - 1.0e-7f
+				&& e.shownScale.distanceSquared(e.scale) < 1.0e-10f;
+		if (arrived) {
+			e.shownPivot = targetPivot;
+			e.shownLeft.set(e.left);
+			e.shownScale.set(e.scale);
+			writeLocal(e.display, e.pos, e.left, e.scale);
+		} else {
+			writeLocal(e.display, e.shownPivot.subtract(pivotOffsetFor(e.display, e.shownLeft, e.shownScale)), e.shownLeft, e.shownScale);
+		}
+		return arrived;
+	}
+
+	private static final Map<Integer, LocalEdit> LOCAL_EDITS = new HashMap<>();
+	private static int nextSeq = 1;
+
+	private static void applyPreview(long sendDelayMs) {
+		applyTo(selected, pos, left, scale, sendDelayMs);
+	}
+
+	/** Shows a change locally right away, and sends it to the server after {@code sendDelayMs} (or later, for {@link #HOLD}). */
+	private static void applyTo(Display d, Vec3 p, Quaternionf l, Vector3f s, long sendDelayMs) {
+		LocalEdit e = LOCAL_EDITS.get(d.getId());
+		if (e == null || e.display != d) {
+			e = new LocalEdit(d);
+			LOCAL_EDITS.put(d.getId(), e);
+		}
+		e.retarget(p, l, s);
+		e.unsent = true;
+		e.confirmed = false;
+		e.sendAtMs = sendDelayMs < 0 ? Long.MAX_VALUE : System.currentTimeMillis() + sendDelayMs;
+		step(e);
+		if (sendDelayMs == 0) {
+			sendNow(e);
+		}
+	}
+
+	private static void sendNow(LocalEdit e) {
+		e.unsent = false;
+		e.sendAtMs = Long.MAX_VALUE;
+		e.sentSeq = nextSeq++;
+		e.sentAtMs = System.currentTimeMillis();
+		Vec3 p = e.pos;
+		Quaternionf l = e.left;
+		Vector3f s = e.scale;
+		ClientPlayNetworking.send(new TransformPayload(e.display.getId(), p.x, p.y, p.z, l.x, l.y, l.z, l.w, s.x, s.y, s.z, e.sentSeq));
+	}
+
+	/**
+	 * Sends changes that are due, gives up on answers that never came, advances the smoothing, and puts every
+	 * unconfirmed change back on its entity in case a server update overwrote it. Runs every client tick (before
+	 * entities tick) and every frame.
+	 */
+	public static void updateLocalEdits() {
+		if (LOCAL_EDITS.isEmpty()) {
+			return;
+		}
+		Minecraft mc = Minecraft.getInstance();
+		long now = System.currentTimeMillis();
+		for (Iterator<LocalEdit> it = LOCAL_EDITS.values().iterator(); it.hasNext();) {
+			LocalEdit e = it.next();
+			if (mc.level == null || e.display.isRemoved() || e.display.level() != mc.level) {
+				it.remove();
+				continue;
+			}
+			if (e.unsent && now >= e.sendAtMs) {
+				sendNow(e);
+			}
+			if (!e.unsent && !e.confirmed && now - e.sentAtMs > CONFIRM_TIMEOUT_MS) {
+				// no answer: ease back to what the server last confirmed
+				e.retarget(e.basePos, e.baseLeft, e.baseScale);
+				e.confirmed = true;
+			}
+			if (step(e) && e.confirmed) {
+				it.remove();
+			}
+		}
+	}
+
+	/** The edit target of a display with an unfinished local edit (what the gizmo works with), or null. */
+	private static LocalEdit localEdit(Display d) {
+		LocalEdit e = LOCAL_EDITS.get(d.getId());
+		return e != null && e.display == d ? e : null;
+	}
+
+	/** The server handled one of our requests: adopt its state, unless a newer local change is still on its way. */
+	public static void onServerResult(TransformResultPayload r) {
+		Vec3 serverPos = new Vec3(r.x(), r.y(), r.z());
+		Quaternionf serverLeft = new Quaternionf(r.qx(), r.qy(), r.qz(), r.qw());
+		Vector3f serverScale = new Vector3f(r.sx(), r.sy(), r.sz());
+		LocalEdit e = LOCAL_EDITS.get(r.entityId());
+		if (e != null) {
+			if (e.unsent || e.sentSeq != r.seq()) {
+				return; // the answer to the newer change will settle it
+			}
+			// Usually the same as the target; if the server refused or adjusted the edit, the display eases to the truth.
+			// The entry stays until the drawn state has caught up, then updateLocalEdits drops it.
+			e.retarget(serverPos, serverLeft, serverScale);
+			e.basePos = serverPos;
+			e.baseLeft = new Quaternionf(serverLeft);
+			e.baseScale = new Vector3f(serverScale);
+			e.confirmed = true;
+			return;
+		}
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level == null || !(mc.level.getEntity(r.entityId()) instanceof Display d)) {
+			return;
+		}
+		if (e == null && dragHandle >= 0 && d == selected) {
+			return; // a drag just started on this display; its own result will follow
+		}
+		writeLocal(d, serverPos, serverLeft, serverScale);
+	}
+
+	/** Writes a state onto the client-side entity so it is drawn that way in this very frame. */
+	private static void writeLocal(Display d, Vec3 p, Quaternionf l, Vector3f s) {
 		Transformation old = Display.createTransformation(d.getEntityData());
-		if (d.getTransformationInterpolationDuration() != 0) {
-			d.setTransformationInterpolationDuration(0);
+		if (!new Quaternionf(old.leftRotation()).equals(l) || !new Vector3f(old.scale()).equals(s)) {
+			if (d.getTransformationInterpolationDuration() != 0) {
+				d.setTransformationInterpolationDuration(0);
+			}
+			d.setTransformation(new Transformation(new Vector3f(old.translation()), new Quaternionf(l), new Vector3f(s),
+					new Quaternionf(old.rightRotation())));
+			// A display only rebuilds what it draws on its next tick; do it now so rotation and scale move in the same
+			// frame as the position instead of trailing it by up to a tick.
+			d.renderState = d.createFreshRenderState();
 		}
-		d.setTransformation(new Transformation(new Vector3f(old.translation()), new Quaternionf(l), new Vector3f(s),
-				new Quaternionf(old.rightRotation())));
-		d.setPos(p.x, p.y, p.z);
+		if (!d.position().equals(p)) {
+			d.setPos(p.x, p.y, p.z);
+		}
 		d.setOldPosAndRot();
-		// Server position updates interpolate (smooth for other viewers); keep them from dragging our local preview around.
+		// Server position updates interpolate (smooth for other viewers); keep them from dragging our local state around.
 		d.getInterpolation().cancel();
-		holdDisplay = d;
-		holdPos = p;
-		holdUntilMs = System.currentTimeMillis() + PREVIEW_HOLD_MS;
-	}
-
-	private static final long PREVIEW_HOLD_MS = 500;
-	private static Display holdDisplay;
-	private static Vec3 holdPos;
-	private static long holdUntilMs;
-
-	/** After an edit the server's (lagging, interpolated) position syncs back; keep showing our own until it caught up. */
-	private static void holdPreview() {
-		if (holdDisplay == null) {
-			return;
-		}
-		if (System.currentTimeMillis() > holdUntilMs || holdDisplay.isRemoved()) {
-			holdDisplay = null;
-			return;
-		}
-		holdDisplay.getInterpolation().cancel();
-		holdDisplay.setPos(holdPos.x, holdPos.y, holdPos.z);
-		holdDisplay.setOldPosAndRot();
-	}
-
-	private static void send() {
-		sendFor(selected.getId(), pos, left, scale);
-	}
-
-	private static void sendFor(int id, Vec3 p, Quaternionf l, Vector3f s) {
-		lastSendMs = System.currentTimeMillis();
-		ClientPlayNetworking.send(new TransformPayload(id, p.x, p.y, p.z, l.x, l.y, l.z, l.w, s.x, s.y, s.z));
 	}
 
 	// ------------------------------------------------------------------ undo
@@ -398,8 +588,7 @@ public final class GizmoController {
 				pos = s.pos;
 				left = new Quaternionf(s.left);
 				scale = new Vector3f(s.scale);
-				applyPreview();
-				send();
+				applyPreview(0);
 				return;
 			}
 		}
@@ -504,18 +693,15 @@ public final class GizmoController {
 				pos = o0.subtract(pivotOffset(s.left, ns));
 			}
 		}
-		applyPreview();
-		if (System.currentTimeMillis() - lastSendMs > 50) {
-			send();
-		}
+		// only shown locally while dragging; the end result goes to the server when the drag ends
+		applyPreview(HOLD);
 	}
 
 	private static void endDrag() {
 		if (changedFrom(dragStart)) {
 			pushUndo(dragStart);
 		}
-		applyPreview();
-		send();
+		applyPreview(0);
 		dragHandle = -1;
 		dragStart = null;
 	}
@@ -717,9 +903,11 @@ public final class GizmoController {
 						GizmoStyle.strokeAndFill(color, scaled(1f), color)));
 	}
 
+	/** Outlines the display as it is drawn (which may still be easing toward the edit), so the box hugs it. */
 	private static void drawSelectionBox() {
 		Transformation t = Display.createTransformation(selected.getEntityData());
-		drawBox(localCorners(selected, pos, t, left, scale), 0xFFFFFFFF, 1.5f);
+		drawBox(localCorners(selected, selected.position(), t, new Quaternionf(t.leftRotation()), new Vector3f(t.scale())),
+				0xFFFFFFFF, 1.5f);
 	}
 
 	/** With nothing selected, mark the visual centre of every display near the player; the one under the crosshair is bigger and white. */

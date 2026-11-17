@@ -7,6 +7,7 @@ import work.yoavtc.displayentitieseditor.net.QuickActionPayload;
 import work.yoavtc.displayentitieseditor.net.SelectPayload;
 import work.yoavtc.displayentitieseditor.net.TextEditPayload;
 import work.yoavtc.displayentitieseditor.net.TransformPayload;
+import work.yoavtc.displayentitieseditor.net.TransformResultPayload;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -57,6 +58,7 @@ public class DisplayEntitiesEditor implements ModInitializer {
 		PayloadTypeRegistry.serverboundPlay().registerLarge(QuickActionPayload.TYPE, QuickActionPayload.CODEC, QuickActionPayload.MAX_BYTES);
 		PayloadTypeRegistry.clientboundPlay().register(SelectPayload.TYPE, SelectPayload.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(OpenMenuPayload.TYPE, OpenMenuPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(TransformResultPayload.TYPE, TransformResultPayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(CreateDisplayPayload.TYPE, CreateDisplayPayload.CODEC);
 		DisplayEntitiesEditorConfig.load();
 		FrameConversion.register();
@@ -139,7 +141,28 @@ public class DisplayEntitiesEditor implements ModInitializer {
 		return pos.add(v.x, v.y, v.z);
 	}
 
+	/**
+	 * Clients edit a display locally and only send the end result; whether it was accepted or not, the client is told
+	 * how the display looks on the server now, so it can keep its preview or fall back to the real state.
+	 */
 	private static void applyTransform(ServerPlayer player, TransformPayload p) {
+		tryApplyTransform(player, p);
+		if (!ServerPlayNetworking.canSend(player, TransformResultPayload.TYPE)) {
+			return;
+		}
+		// same reach rule as editing, so this cannot be used to look up displays far away
+		Display display = lookup(player, p.entityId());
+		if (display == null) {
+			return;
+		}
+		Transformation t = Display.createTransformation(display.getEntityData());
+		Quaternionf l = new Quaternionf(t.leftRotation());
+		Vector3f s = new Vector3f(t.scale());
+		ServerPlayNetworking.send(player, new TransformResultPayload(p.entityId(), p.seq(),
+				display.getX(), display.getY(), display.getZ(), l.x, l.y, l.z, l.w, s.x, s.y, s.z));
+	}
+
+	private static void tryApplyTransform(ServerPlayer player, TransformPayload p) {
 		if (!checkPermission(player) || !allow(player, "transform", MAX_TRANSFORMS_PER_SECOND)) {
 			return;
 		}
