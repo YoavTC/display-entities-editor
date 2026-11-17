@@ -5,7 +5,10 @@ import com.mojang.math.Transformation;
 import work.yoavtc.displayentitieseditor.net.QuickActionPayload;
 import work.yoavtc.displayentitieseditor.net.TextEditPayload;
 import work.yoavtc.displayentitieseditor.net.TextOptions;
+import java.util.List;
 import java.util.Locale;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -20,13 +23,15 @@ import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-/** Server side of the quick-action menu: delete, change content, reset scale/rotation, align to block. */
+/** Server side of the quick-action menu: delete, change content or block state, reset scale/rotation, align to block. */
 final class QuickActions {
 	private QuickActions() {
 	}
@@ -43,6 +48,25 @@ final class QuickActions {
 	}
 
 	private static void apply(ServerPlayer player, QuickActionPayload p) {
+		applyAction(player, p);
+		if (p.action() == QuickActionPayload.Action.SET_BLOCK_STATE) {
+			resyncBlockState(player, p.entityId());
+		}
+	}
+
+	/**
+	 * The block state screen previews changes on the client before sending them. Whatever happened to the request
+	 * (applied, refused, invalid), send that player the display's real block state so a refused preview is undone.
+	 */
+	private static void resyncBlockState(ServerPlayer player, int entityId) {
+		if (player.level().getEntity(entityId) instanceof Display.BlockDisplay block
+				&& block.distanceToSqr(player) <= DisplayEntitiesEditor.MAX_PLAYER_DISTANCE * DisplayEntitiesEditor.MAX_PLAYER_DISTANCE) {
+			player.connection.send(new ClientboundSetEntityDataPacket(entityId,
+					List.of(SynchedEntityData.DataValue.create(Display.BlockDisplay.DATA_BLOCK_STATE_ID, block.getBlockState()))));
+		}
+	}
+
+	private static void applyAction(ServerPlayer player, QuickActionPayload p) {
 		Display display = DisplayEntitiesEditor.findEditable(player, p.entityId());
 		if (display == null) {
 			return;
@@ -78,6 +102,15 @@ final class QuickActions {
 				}
 				String state = p.arg().contains(":") ? p.arg().trim() : "minecraft:" + p.arg().trim();
 				merge(player, display, "block_state", "{block_state:" + StringTag.quoteAndEscape(state.toLowerCase(Locale.ROOT)) + "}");
+			}
+			case SET_BLOCK_STATE -> {
+				if (!(display instanceof Display.BlockDisplay block)) {
+					return;
+				}
+				BlockState state = withProperties(player, block.getBlockState(), p.arg());
+				if (state != null) {
+					block.setBlockState(state);
+				}
 			}
 			case SET_ITEM -> {
 				if (!(display instanceof Display.ItemDisplay)) {
@@ -122,6 +155,41 @@ final class QuickActions {
 				tag.putString("billboard", modes[(index + 1) % modes.length]);
 			});
 		}
+	}
+
+	/**
+	 * Applies "name=value,name=value" to a block state. Only properties the block really has, with values it allows,
+	 * are accepted (the block itself never changes). Returns null, after telling the player why, if anything is invalid.
+	 */
+	private static BlockState withProperties(ServerPlayer player, BlockState state, String arg) {
+		for (String pair : arg.split(",")) {
+			if (pair.isBlank()) {
+				continue;
+			}
+			int eq = pair.indexOf('=');
+			if (eq < 0) {
+				tell(player, "Invalid block state: " + pair.strip());
+				return null;
+			}
+			String name = pair.substring(0, eq).strip();
+			String value = pair.substring(eq + 1).strip();
+			Property<?> property = state.getBlock().getStateDefinition().getProperty(name);
+			if (property == null) {
+				tell(player, "This block has no \"" + name + "\" property.");
+				return null;
+			}
+			BlockState next = withValue(state, property, value);
+			if (next == null) {
+				tell(player, "\"" + value + "\" is not a valid value for " + name + ".");
+				return null;
+			}
+			state = next;
+		}
+		return state;
+	}
+
+	private static <T extends Comparable<T>> BlockState withValue(BlockState state, Property<T> property, String value) {
+		return property.getValue(value).map(v -> state.setValue(property, v)).orElse(null);
 	}
 
 	/**

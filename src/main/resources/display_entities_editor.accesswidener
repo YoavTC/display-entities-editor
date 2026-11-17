@@ -6,6 +6,7 @@ accessible method net/minecraft/world/entity/Display getTransformationInterpolat
 accessible method net/minecraft/world/entity/Display$ItemDisplay getItemStack ()Lnet/minecraft/world/item/ItemStack;
 accessible method net/minecraft/world/entity/Display setPosRotInterpolationDuration (I)V
 accessible method net/minecraft/world/entity/Display getPosRotInterpolationDuration ()I
+accessible field net/minecraft/world/entity/Display$BlockDisplay DATA_BLOCK_STATE_ID Lnet/minecraft/network/syncher/EntityDataAccessor;
 accessible field net/minecraft/world/entity/Display renderState Lnet/minecraft/world/entity/Display$RenderState;
 accessible method net/minecraft/world/entity/Display createFreshRenderState ()Lnet/minecraft/world/entity/Display$RenderState;
 accessible method net/minecraft/world/entity/Display getBillboardConstraints ()Lnet/minecraft/world/entity/Display$BillboardConstraints;

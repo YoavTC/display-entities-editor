@@ -50,8 +50,18 @@ public class QuickMenuScreen extends Screen {
 		};
 		List<Row> rows = new ArrayList<>();
 		switch (kind) {
-			case BLOCK -> rows.add(new Row("Change Block", () -> minecraft.setScreenAndShow(
-					new BrowserScreen(Kind.BLOCK, id -> send(Action.SET_BLOCK, id), back))));
+			case BLOCK -> {
+				rows.add(new Row("Change Block", () -> minecraft.setScreenAndShow(
+						new BrowserScreen(Kind.BLOCK, id -> send(Action.SET_BLOCK, id), back))));
+				var level = minecraft.level;
+				if (level != null && level.getEntity(entityId) instanceof Display.BlockDisplay block && BlockStateScreen.hasProperties(block)) {
+					rows.add(new Row("Edit Block State", () -> {
+						if (!block.isRemoved()) {
+							minecraft.setScreenAndShow(new BlockStateScreen(block, back));
+						}
+					}));
+				}
+			}
 			case ITEM -> rows.add(new Row("Change Item", () -> minecraft.setScreenAndShow(
 					new BrowserScreen(Kind.ITEM, id -> send(Action.SET_ITEM, id), back))));
 			case TEXT -> rows.add(new Row("Edit Text & Options", () -> {
