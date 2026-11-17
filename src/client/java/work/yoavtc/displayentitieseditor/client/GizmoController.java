@@ -152,7 +152,9 @@ public final class GizmoController {
 
 	/** Mouse wheel nudge on the hovered handle. Returns true if the scroll was consumed. */
 	public static boolean onScroll(double dy) {
-		if (!active || selected == null || dragHandle >= 0 || hover < 0 || hover == CENTER || dy == 0) {
+		// with a screen open the wheel belongs to the screen (the hovered handle is stale from before it opened)
+		if (!active || selected == null || dragHandle >= 0 || hover < 0 || hover == CENTER || dy == 0
+				|| Minecraft.getInstance().gui.screen() != null) {
 			return false;
 		}
 		int steps = dy > 0 ? 1 : -1;
