@@ -1,15 +1,12 @@
 package work.yoavtc.displayentitieseditor;
 
 import com.mojang.math.Transformation;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Display;
@@ -40,13 +37,7 @@ final class Clipboard {
 	private static final String[] ITEM_OPTIONS = {"item_display"};
 
 	private enum Kind {
-		BLOCK("block display"), ITEM("item display"), TEXT("text display");
-
-		final String label;
-
-		Kind(String label) {
-			this.label = label;
-		}
+		BLOCK, ITEM, TEXT;
 
 		static Kind of(Display d) {
 			return d instanceof Display.BlockDisplay ? BLOCK : d instanceof Display.ItemDisplay ? ITEM : TEXT;
@@ -69,22 +60,16 @@ final class Clipboard {
 		BlockState blockState = display instanceof Display.BlockDisplay block ? block.getBlockState() : null;
 		ItemStack stack = display instanceof Display.ItemDisplay item ? item.getItemStack() : ItemStack.EMPTY;
 		boolean head = stack.is(Items.PLAYER_HEAD);
-		Kind kind = Kind.of(display);
-		CLIPBOARDS.put(player.getUUID(), new Entry(kind, out.buildResult(), new Quaternionf(t.leftRotation()),
+		CLIPBOARDS.put(player.getUUID(), new Entry(Kind.of(display), out.buildResult(), new Quaternionf(t.leftRotation()),
 				new Quaternionf(t.rightRotation()), new Vector3f(t.scale()), display.getYRot(), display.getXRot(),
 				blockState, head, head ? stack.get(DataComponents.PROFILE) : null));
-		String what = blockState != null ? blockState.getBlock().getName().getString()
-				: head ? "player head" : !stack.isEmpty() ? stack.getHoverName().getString() : kind.label;
-		player.sendOverlayMessage(Component.literal("Copied " + what + " (" + kind.label + ")"));
 	}
 
 	static void paste(ServerPlayer player, Display target) {
 		Entry e = CLIPBOARDS.get(player.getUUID());
 		if (e == null) {
-			player.sendOverlayMessage(Component.literal("Nothing copied yet: select a display and press Ctrl+C"));
-			return;
+			return; // nothing copied yet
 		}
-		List<String> applied = new ArrayList<>(List.of("rotation", "scale"));
 		Kind kind = Kind.of(target);
 
 		if (kind == e.kind()) {
@@ -93,12 +78,10 @@ final class Clipboard {
 				copyKeys(e.tag(), tag, COMMON_OPTIONS);
 				copyKeys(e.tag(), tag, typeOptions);
 			});
-			applied.add("options");
 		}
 		if (target instanceof Display.BlockDisplay block && e.blockState() != null
 				&& block.getBlockState().getBlock() == e.blockState().getBlock()) {
 			block.setBlockState(e.blockState());
-			applied.add("block state");
 		}
 		if (target instanceof Display.ItemDisplay item && e.head() && item.getItemStack().is(Items.PLAYER_HEAD)) {
 			ItemStack stack = item.getItemStack().copy();
@@ -108,14 +91,12 @@ final class Clipboard {
 				stack.remove(DataComponents.PROFILE);
 			}
 			item.setItemStack(stack);
-			applied.add("head texture");
 		}
 
 		target.setYRot(e.yRot());
 		target.setXRot(e.xRot());
 		QuickActions.retransform(target, t -> new Transformation(new Vector3f(t.translation()), new Quaternionf(e.left()),
 				new Vector3f(e.scale()), new Quaternionf(e.right())));
-		player.sendOverlayMessage(Component.literal("Pasted " + String.join(", ", applied)));
 	}
 
 	/** Copies the given top-level keys; a key the source does not have is removed, so the target falls back to the default too. */
