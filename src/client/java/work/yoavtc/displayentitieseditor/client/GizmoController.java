@@ -77,6 +77,8 @@ public final class GizmoController {
 	private static boolean lastRmb;
 	private static boolean lastDelete;
 	private static boolean lastUndo;
+	private static boolean lastCopy;
+	private static boolean lastPaste;
 	private static int pendingSelectId = -1;
 	private static long pendingSelectUntilMs;
 
@@ -280,8 +282,20 @@ public final class GizmoController {
 		if (undo && !lastUndo && dragHandle < 0) {
 			undo();
 		}
+		// copy / paste happen on the server (it keeps the clipboard); paste is undoable for position, rotation and scale
+		boolean copy = ctrl() && DisplayEntitiesEditorClient.copyKey.isDown();
+		boolean paste = ctrl() && DisplayEntitiesEditorClient.pasteKey.isDown();
+		if (selected != null && dragHandle < 0 && copy && !lastCopy) {
+			ClientPlayNetworking.send(new QuickActionPayload(selected.getId(), QuickActionPayload.Action.COPY));
+		}
+		if (selected != null && dragHandle < 0 && paste && !lastPaste) {
+			pushUndo(snapshot());
+			ClientPlayNetworking.send(new QuickActionPayload(selected.getId(), QuickActionPayload.Action.PASTE));
+		}
 		lastDelete = delete;
 		lastUndo = undo;
+		lastCopy = copy;
+		lastPaste = paste;
 	}
 
 	// ------------------------------------------------------------------ entity state

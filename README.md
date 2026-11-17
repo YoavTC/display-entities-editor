@@ -55,6 +55,21 @@ field starts with the display's current value. A button opens the
 
 Text is flat, so a text display has no depth handle when scaling and its selection box is paper thin.
 
+## Copy and paste
+
+With a display selected, **Ctrl+C** copies its look and **Ctrl+V** applies it to the selected display:
+
+- **Always:** rotation (including the entity's own yaw/pitch) and scale. The target keeps its position and its
+  visual centre stays where it was.
+- **Block state:** when both are block displays of the same block (e.g. copying stairs' facing and half onto other stairs).
+- **Head texture:** when both are player head item displays (the profile component).
+- **Every other option:** when both are the same type of display: billboard, brightness, view range, shadow,
+  glow colour, size and interpolation duration, plus item transform for item displays, and background, text opacity,
+  shadow, see-through, alignment and line width for text displays. The content itself (block, item, text) is not copied.
+
+The clipboard is kept on the server for each player and is cleared when they leave. Ctrl+Z undoes a paste's
+position, rotation and scale. The keys can be rebound under Controls (the Ctrl part stays).
+
 ## Deleting displays
 
 Deleting a display (the Delete key or the quick menu) only drops an item frame for displays this mod created from an item frame. Those carry the entity tag `display_entities_editor.from_frame`, which is saved with the entity. Displays without the tag, such as ones summoned by command, are simply removed and drop nothing.

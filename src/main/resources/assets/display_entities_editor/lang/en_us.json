@@ -3,5 +3,7 @@
 	"key.display_entities_editor.cycle_mode": "Cycle Mode (Translate / Rotate / Scale)",
 	"key.display_entities_editor.cycle_nudge": "Cycle Scroll Nudge Amount",
 	"key.display_entities_editor.delete": "Delete Selected Display",
-	"key.display_entities_editor.undo": "Undo (with Ctrl)"
+	"key.display_entities_editor.undo": "Undo (with Ctrl)",
+	"key.display_entities_editor.copy": "Copy Selected Display (with Ctrl)",
+	"key.display_entities_editor.paste": "Paste onto Selected Display (with Ctrl)"
 }
