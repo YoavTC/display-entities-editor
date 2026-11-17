@@ -62,6 +62,7 @@ public final class GizmoHud {
 				key(mc.options.keyShift) + " + Click - Quick Menu",
 				key(DisplayEntitiesEditorClient.deleteKey) + " - Remove",
 				"Ctrl+" + key(DisplayEntitiesEditorClient.undoKey) + " - Undo",
+				"Ctrl+" + key(DisplayEntitiesEditorClient.copyKey) + " / Ctrl+" + key(DisplayEntitiesEditorClient.pasteKey) + " - Copy / Paste",
 		};
 	}
 

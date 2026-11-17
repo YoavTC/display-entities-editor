@@ -71,6 +71,7 @@ public class DisplayEntitiesEditor implements ModInitializer {
 			LAST_DENIED.remove(id);
 			RATE.keySet().removeIf(k -> k.startsWith(id + "/"));
 			EditSmoothing.playerLeft(id);
+			Clipboard.forget(id);
 		});
 		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> EditSmoothing.tick());
 		net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPING.register(server -> EditSmoothing.restoreAll());

@@ -21,6 +21,8 @@ public class DisplayEntitiesEditorClient implements ClientModInitializer {
 	static KeyMapping cycleNudgeKey;
 	static KeyMapping deleteKey;
 	static KeyMapping undoKey;
+	static KeyMapping copyKey;
+	static KeyMapping pasteKey;
 
 	@Override
 	public void onInitializeClient() {
@@ -28,6 +30,8 @@ public class DisplayEntitiesEditorClient implements ClientModInitializer {
 		cycleNudgeKey = register("cycle_nudge", InputConstants.KEY_J);
 		deleteKey = register("delete", InputConstants.KEY_DELETE);
 		undoKey = register("undo", InputConstants.KEY_Z);
+		copyKey = register("copy", InputConstants.KEY_C);
+		pasteKey = register("paste", InputConstants.KEY_V);
 
 		// before entities tick, so a server update that overwrote an unconfirmed local edit is undone before it is drawn
 		ClientTickEvents.START_CLIENT_TICK.register(client -> GizmoController.updateLocalEdits());

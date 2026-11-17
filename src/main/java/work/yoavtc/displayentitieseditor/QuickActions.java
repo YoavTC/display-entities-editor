@@ -78,6 +78,8 @@ final class QuickActions {
 		}
 		switch (p.action()) {
 			case DELETE -> delete(player, display);
+			case COPY -> Clipboard.copy(player, display);
+			case PASTE -> Clipboard.paste(player, display);
 			case RESET_SCALE -> retransform(display, t -> new Transformation(new Vector3f(t.translation()),
 					new Quaternionf(t.leftRotation()), new Vector3f(1, 1, 1), new Quaternionf(t.rightRotation())));
 			case RESET_ROTATION -> {
@@ -270,7 +272,7 @@ final class QuickActions {
 	}
 
 	/** Visual centre of the display in world space (block displays are drawn from their corner). */
-	private static Vec3 center(Display display) {
+	static Vec3 center(Display display) {
 		Transformation t = Display.createTransformation(display.getEntityData());
 		float c = display instanceof Display.BlockDisplay ? 0.5f : 0f;
 		Vector3f v = new Vector3f(c, c, c);
@@ -279,7 +281,7 @@ final class QuickActions {
 	}
 
 	/** Applies a new transformation while keeping the visual centre where it was. */
-	private static void retransform(Display display, java.util.function.UnaryOperator<Transformation> change) {
+	static void retransform(Display display, java.util.function.UnaryOperator<Transformation> change) {
 		Vec3 before = center(display);
 		display.setTransformation(change.apply(Display.createTransformation(display.getEntityData())));
 		Vec3 after = center(display);
@@ -287,7 +289,7 @@ final class QuickActions {
 	}
 
 	/** Save the display to NBT, let {@code change} edit it, and load it back (what /data modify does). */
-	private static void modify(ServerPlayer player, Display display, java.util.function.Consumer<CompoundTag> change) {
+	static void modify(ServerPlayer player, Display display, java.util.function.Consumer<CompoundTag> change) {
 		ServerLevel level = player.level();
 		TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, level.registryAccess());
 		display.saveWithoutId(out);

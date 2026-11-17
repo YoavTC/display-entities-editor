@@ -10,7 +10,11 @@ public record QuickActionPayload(int entityId, Action action, String arg) implem
 	public enum Action {
 		DELETE, SET_BLOCK, SET_ITEM, SET_TEXTURE, RESET_SCALE, RESET_ROTATION, ALIGN_TO_BLOCK, CYCLE_BILLBOARD,
 		/** Change block state properties of a block display, keeping the block: arg is "name=value,name=value". */
-		SET_BLOCK_STATE
+		SET_BLOCK_STATE,
+		/** Remember this display's look on the server, in the player's clipboard. */
+		COPY,
+		/** Apply the player's clipboard to this display (what carries over depends on both displays' types). */
+		PASTE
 	}
 
 	/** Longest argument the packet carries (characters). Only head textures may be this long; see {@link #SHORT_ARG}. */
