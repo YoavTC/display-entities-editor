@@ -5,6 +5,7 @@ import work.yoavtc.displayentitieseditor.DisplayEntitiesEditor;
 import work.yoavtc.displayentitieseditor.DisplayEntitiesEditorConfig;
 import work.yoavtc.displayentitieseditor.net.OpenMenuPayload;
 import work.yoavtc.displayentitieseditor.net.SelectPayload;
+import work.yoavtc.displayentitieseditor.net.TransformResultPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -28,6 +29,8 @@ public class DisplayEntitiesEditorClient implements ClientModInitializer {
 		deleteKey = register("delete", InputConstants.KEY_DELETE);
 		undoKey = register("undo", InputConstants.KEY_Z);
 
+		// before entities tick, so a server update that overwrote an unconfirmed local edit is undone before it is drawn
+		ClientTickEvents.START_CLIENT_TICK.register(client -> GizmoController.updateLocalEdits());
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			// Holding the wand is what turns edit mode on and off.
 			boolean holding = client.player != null
@@ -47,6 +50,8 @@ public class DisplayEntitiesEditorClient implements ClientModInitializer {
 		HudElementRegistry.addLast(DisplayEntitiesEditor.id("hud"), GizmoHud::render);
 		ClientPlayNetworking.registerGlobalReceiver(SelectPayload.TYPE,
 				(payload, context) -> GizmoController.selectById(payload.entityId()));
+		ClientPlayNetworking.registerGlobalReceiver(TransformResultPayload.TYPE,
+				(payload, context) -> GizmoController.onServerResult(payload));
 		ClientPlayNetworking.registerGlobalReceiver(OpenMenuPayload.TYPE,
 				(payload, context) -> context.client().setScreenAndShow(new ChooseTypeScreen(payload.frameId())));
 	}
